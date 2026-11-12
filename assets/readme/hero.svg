@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" role="img" aria-labelledby="title desc">
+  <title id="title">VICE CITY 6 — Neon Coast</title>
+  <desc id="desc">Browser-based 3D open-world action sandbox built with Three.js and TypeScript, locked at 60 FPS with zero binary assets.</desc>
+
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a14"/>
+      <stop offset="50%" stop-color="#101026"/>
+      <stop offset="100%" stop-color="#07080e"/>
+    </linearGradient>
+
+    <linearGradient id="title-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff2a85"/>
+      <stop offset="50%" stop-color="#ff71ce"/>
+      <stop offset="100%" stop-color="#01cdfe"/>
+    </linearGradient>
+
+    <linearGradient id="accent-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#01cdfe"/>
+      <stop offset="100%" stop-color="#05ffa1"/>
+    </linearGradient>
+
+    <linearGradient id="card-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16182e" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0e101f" stop-opacity="0.8"/>
+    </linearGradient>
+
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ff2a85" stroke-opacity="0.07" stroke-width="1"/>
+    </pattern>
+
+    <filter id="glow-pink" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1200" height="380" rx="20" fill="url(#bg-grad)"/>
+
+  <!-- Subtle Synthwave Grid -->
+  <rect width="1200" height="380" rx="20" fill="url(#grid)"/>
+
+  <!-- Top Decorative Neon Line -->
+  <rect x="0" y="0" width="1200" height="3" fill="url(#title-grad)" opacity="0.85"/>
+
+  <!-- Left: Brand / Title / Value Proposition -->
+  <g id="brand-block" transform="translate(64, 48)">
+    <!-- District tag -->
+    <g transform="translate(0, 0)">
+      <rect width="140" height="26" rx="6" fill="#ff2a85" fill-opacity="0.15" stroke="#ff2a85" stroke-width="1"/>
+      <text x="12" y="18" fill="#ff71ce" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">OPEN WORLD 3D</text>
+    </g>
+
+    <g transform="translate(152, 0)">
+      <rect width="105" height="26" rx="6" fill="#01cdfe" fill-opacity="0.15" stroke="#01cdfe" stroke-width="1"/>
+      <text x="10" y="18" fill="#01cdfe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">60 FPS LOCK</text>
+    </g>
+
+    <g transform="translate(269, 0)">
+      <rect width="145" height="26" rx="6" fill="#05ffa1" fill-opacity="0.15" stroke="#05ffa1" stroke-width="1"/>
+      <text x="10" y="18" fill="#05ffa1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">ZERO ASSETS 0KB</text>
+    </g>
+
+    <!-- Main Title -->
+    <text x="0" y="96" fill="url(#title-grad)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="58" font-weight="900" letter-spacing="2">VICE CITY 6</text>
+    <text x="375" y="96" fill="#01cdfe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="700" letter-spacing="4" opacity="0.95">NEON COAST</text>
+
+    <!-- Tagline -->
+    <text x="0" y="136" fill="#e2e8f0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="19" font-weight="500">
+      A neon-noir browser action sandbox: steal cars, outrun police, and take over the city.
+    </text>
+    <text x="0" y="162" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="400">
+      Procedural textures, primitives &amp; Web Audio synthesis. Completely offline &amp; private.
+    </text>
+
+    <!-- Action Pills / Badges -->
+    <g transform="translate(0, 204)">
+      <!-- Play button badge -->
+      <a href="https://youxufkhan.github.io/vicecity6/">
+        <rect width="210" height="46" rx="10" fill="#01cdfe" fill-opacity="0.2" stroke="#01cdfe" stroke-width="1.8"/>
+        <!-- pulsing dot -->
+        <circle cx="24" cy="23" r="5" fill="#05ffa1"/>
+        <text x="38" y="29" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" letter-spacing="0.5">PLAY IN BROWSER</text>
+        <path d="M 186 20 L 194 23 L 186 26 Z" fill="#01cdfe"/>
+      </a>
+
+      <!-- Tech specs -->
+      <g transform="translate(225, 0)">
+        <rect width="180" height="46" rx="10" fill="#1e2238" stroke="#334155" stroke-width="1"/>
+        <text x="16" y="28" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">Three.js + TypeScript</text>
+      </g>
+
+      <g transform="translate(420, 0)">
+        <rect width="170" height="46" rx="10" fill="#1e2238" stroke="#334155" stroke-width="1"/>
+        <text x="16" y="28" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">Vite 5 Production</text>
+      </g>
+    </g>
+
+    <!-- Key Performance metrics -->
+    <g transform="translate(0, 276)">
+      <text x="0" y="14" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" letter-spacing="1">BUDGET &amp; CONSTRAINTS:</text>
+      <text x="165" y="14" fill="#a5b4fc" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">~250 Draw Calls</text>
+      <circle cx="288" cy="10" r="2.5" fill="#475569"/>
+      <text x="300" y="14" fill="#a5b4fc" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">~65k Triangles</text>
+      <circle cx="410" cy="10" r="2.5" fill="#475569"/>
+      <text x="422" y="14" fill="#a5b4fc" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">60Hz Physics Step</text>
+    </g>
+  </g>
+
+  <!-- Right: Live Feature Matrix Board -->
+  <g id="features-board" transform="translate(730, 48)">
+    <rect width="406" height="284" rx="14" fill="url(#card-grad)" stroke="#2b2d42" stroke-width="1.2"/>
+    
+    <!-- Header of card -->
+    <path d="M 0 14 C 0 6.27 6.27 0 14 0 L 392 0 C 399.73 0 406 6.27 406 14 L 406 42 L 0 42 Z" fill="#121324"/>
+    <circle cx="20" cy="21" r="5" fill="#ff5f56"/>
+    <circle cx="36" cy="21" r="5" fill="#ffbd2e"/>
+    <circle cx="52" cy="21" r="5" fill="#27c93f"/>
+    <text x="76" y="26" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" font-weight="600">neon-coast://game-engine-status</text>
+
+    <!-- Item 1: Arcade Driving -->
+    <g transform="translate(20, 62)">
+      <rect width="36" height="36" rx="8" fill="#ff2a85" fill-opacity="0.15" stroke="#ff2a85" stroke-opacity="0.4" stroke-width="1"/>
+      <text x="12" y="24" fill="#ff71ce" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16">🚗</text>
+      <text x="48" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700">Arcade Vehicle Dynamics</text>
+      <text x="48" y="32" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">6 archetypes, torque curves, drifts &amp; body roll</text>
+    </g>
+
+    <!-- Item 2: Wanted Heat -->
+    <g transform="translate(20, 114)">
+      <rect width="36" height="36" rx="8" fill="#ffbd2e" fill-opacity="0.15" stroke="#ffbd2e" stroke-opacity="0.4" stroke-width="1"/>
+      <text x="12" y="24" fill="#ffd166" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16">⭐</text>
+      <text x="48" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700">5-Star Dynamic Wanted Heat</text>
+      <text x="48" y="32" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">Cruiser pursuits, ramming &amp; foot police</text>
+    </g>
+
+    <!-- Item 3: Procedural City -->
+    <g transform="translate(20, 166)">
+      <rect width="36" height="36" rx="8" fill="#01cdfe" fill-opacity="0.15" stroke="#01cdfe" stroke-opacity="0.4" stroke-width="1"/>
+      <text x="12" y="24" fill="#01cdfe" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16">🏙️</text>
+      <text x="48" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700">Seed-Deterministic 6x6 World</text>
+      <text x="48" y="32" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">5 districts, traffic AI, crowds &amp; day/night cycle</text>
+    </g>
+
+    <!-- Item 4: Web Audio Synth -->
+    <g transform="translate(20, 218)">
+      <rect width="36" height="36" rx="8" fill="#05ffa1" fill-opacity="0.15" stroke="#05ffa1" stroke-opacity="0.4" stroke-width="1"/>
+      <text x="12" y="24" fill="#05ffa1" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16">🔊</text>
+      <text x="48" y="17" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700">100% Procedural Web Audio</text>
+      <text x="48" y="32" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">Dynamic engine revs, sirens, gunshots &amp; synthwave</text>
+    </g>
+  </g>
+</svg>
