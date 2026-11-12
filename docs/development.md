@@ -109,6 +109,12 @@ errors: an inverted movement axis, a reversed steering sign, a flipped winding
 order. When something moves the wrong way, verify the convention in
 [algorithms.md](algorithms.md) before changing anything else.
 
+**Fix the cause, not the symptom.** Several of the worst bugs here — invisible
+traffic, inverted walking, an ocean-coloured street, a car that could not be
+driven — all looked like local problems but had their cause somewhere else.
+When a fix feels like a special case, that is usually a signal the model is
+wrong somewhere else.
+
 ## Adding a feature, end to end
 
 1. **Model** it in the right module (see the table above).
