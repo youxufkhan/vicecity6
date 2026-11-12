@@ -119,6 +119,22 @@ const weapon = await page.evaluate(() => {
 check(weapon.weapon !== 'UNARMED', `player starts with a weapon (${weapon.weapon})`);
 check(weapon.ammo > 0, `player starts with ammunition (${weapon.ammo})`);
 
+console.log('\n── officers on foot can be shot and killed ──');
+const copShoot = await page.evaluate(() => {
+  const g = window.__game;
+  return g.debugShootCop();
+});
+check(copShoot.hit, 'bullet hitscan detects officer on foot');
+check(copShoot.killed, 'damage to officer on foot kills them');
+check(!copShoot.copAlive, 'dead officer is marked not alive');
+
+console.log('\n── traffic signal cycles vary by district density ──');
+const cycles = await page.evaluate(() => {
+  const g = window.__game;
+  return g.debugTrafficCycles();
+});
+check(cycles.downtown > cycles.outer, `downtown cycle (${cycles.downtown}s) longer than perimeter (${cycles.outer}s)`);
+
 await browser.close();
 server.close();
 

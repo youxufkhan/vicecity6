@@ -93,6 +93,8 @@ export interface RoadNode {
   edges: number[];
   /** Phase offset so neighbouring intersections are not in lockstep. */
   signalOffset: number;
+  /** Traffic signal cycle duration (s), scaled by intersection density. */
+  cycleLength: number;
 }
 
 export interface RoadEdge {
@@ -113,6 +115,8 @@ export class RoadNetwork {
   constructor() {
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
+        const centerDist = Math.hypot(col - 3, row - 3);
+        const cycleLength = Math.round(17 - Math.min(3, centerDist) * 2);
         this.nodes.push({
           id: this.nodes.length,
           col,
@@ -121,6 +125,7 @@ export class RoadNetwork {
           z: roadCenterZ(row),
           edges: [],
           signalOffset: (col * 3 + row * 5) % 7,
+          cycleLength,
         });
       }
     }
@@ -201,7 +206,7 @@ export class RoadNetwork {
   /** Full signal state including the amber transition. */
   signalState(nodeId: number, axis: 'x' | 'z', time: number): 'green' | 'yellow' | 'red' {
     const node = this.nodes[nodeId];
-    const cycle = 14;
+    const cycle = node.cycleLength;
     const t = (time + node.signalOffset * 1.7) % (cycle * 2);
     const inFirstHalf = t < cycle;
     const isX = axis === 'x';
@@ -214,7 +219,7 @@ export class RoadNetwork {
   /** Seconds until the given axis turns green (used for AI patience). */
   secondsUntilGreen(nodeId: number, axis: 'x' | 'z', time: number): number {
     const node = this.nodes[nodeId];
-    const cycle = 14;
+    const cycle = node.cycleLength;
     const t = time + node.signalOffset * 1.7;
     const phase = Math.floor(t / cycle) % 2;
     const wantGreen = axis === 'x' ? 0 : 1;

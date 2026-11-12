@@ -9,7 +9,7 @@ import { Player } from './entities/Player';
 import { Vehicle, resolveVehiclePairs } from './entities/Vehicle';
 import { TrafficManager, type TrafficAI } from './entities/Traffic';
 import { PedManager, type Pedestrian } from './entities/Pedestrian';
-import { FootCopManager } from './entities/FootCop';
+import { FootCop, FootCopManager } from './entities/FootCop';
 import { CAR_SPECS, CIVIL_PAINT, headlightMaterial, tailMaterial } from './entities/CarFactory';
 import { CameraRig } from './systems/CameraRig';
 import { Effects } from './systems/Effects';
@@ -156,6 +156,7 @@ export class Game {
     this.weapons = new WeaponSystem({
       world: this.city.collision,
       peds: this.peds.peds,
+      cops: this.footCops.cops,
       vehicles: this.weaponTargets,
       effects: this.effects,
       audio: this.audio,
@@ -163,6 +164,7 @@ export class Game {
       aimOrigin: this.weaponAimOrigin,
       aimDir: this.weaponAimDir,
       onPedHit: (ped, damage, killed) => this.onPedHit(ped, damage, killed),
+      onCopHit: (cop, damage, killed) => this.onCopHit(cop, damage, killed),
       onVehicleHit: (vehicle, damage) => this.onVehicleHit(vehicle, damage),
       onShot: (weapon) => this.onShot(weapon.id),
     });
@@ -625,7 +627,7 @@ export class Game {
     this.traffic.updateTraffic(dt, world, this.player.position.x, this.player.position.z, this.elapsed);
 
     /* ── pedestrians ── */
-    this.peds.update(dt, world, this.player.position.x, this.player.position.z);
+    this.peds.update(dt, world, this.player.position.x, this.player.position.z, allVehicles);
     this.handlePedCollisions(allVehicles);
 
     /* ── wanted ── */
@@ -837,6 +839,18 @@ export class Game {
     this.audio.play('hit');
   }
 
+  private onCopHit(cop: FootCop, damage: number, killed: boolean): void {
+    void damage;
+    if (killed) {
+      this.wanted.add(1.5);
+      this.hud.toast('Officer down', 'bad');
+      this.dropCash(cop.position.x, cop.position.z, this.rng.int(100, 250));
+    } else {
+      this.wanted.add(0.4);
+    }
+    this.audio.play('hit');
+  }
+
   private onVehicleHit(vehicle: Vehicle, damage: number): void {
     void damage;
     if (vehicle.driver === 'police' || this.traffic.police.includes(vehicle)) {
@@ -876,6 +890,20 @@ export class Game {
         if (car.driver === 'player') {
           this.wanted.add(killed ? 0.8 : 0.45);
           this.hud.toast(killed ? 'You ran someone over' : 'You hit a pedestrian', 'bad');
+        }
+      }
+      for (const cop of this.footCops.cops) {
+        if (!cop.alive) continue;
+        const d = dist2D(cop.position.x, cop.position.z, car.position.x, car.position.z);
+        if (d > radius + 0.5) continue;
+        const killed = cop.damage(120);
+        this.effects.blood(cop.position.x, 1, cop.position.z);
+        if (car.driver === 'player') {
+          this.wanted.add(killed ? 1.4 : 0.6);
+          this.hud.toast(killed ? 'You ran over an officer' : 'You hit an officer', 'bad');
+          if (killed) {
+            this.dropCash(cop.position.x, cop.position.z, this.rng.int(100, 250));
+          }
         }
       }
     }
@@ -1096,10 +1124,8 @@ export class Game {
       if (d < 70) blips.push({ x: v.position.x, z: v.position.z, kind: 'vehicle' });
     }
     for (const pickup of this.pickups) {
-      if (pickup.kind === 'cash') {
-        const d = dist2D(pickup.x, pickup.z, this.player.position.x, this.player.position.z);
-        if (d < 90) blips.push({ x: pickup.x, z: pickup.z, kind: 'pickup' });
-      }
+      const d = dist2D(pickup.x, pickup.z, this.player.position.x, this.player.position.z);
+      if (d < 95) blips.push({ x: pickup.x, z: pickup.z, kind: 'pickup' });
     }
     for (const ped of this.peds.peds) {
       const d = dist2D(ped.position.x, ped.position.z, this.player.position.x, this.player.position.z);
@@ -1333,6 +1359,29 @@ export class Game {
         Math.round(c.position.x),
         Math.round(c.position.z),
       ]),
+    };
+  }
+
+  /** Used by tests to verify foot officer combat and hit detection. */
+  debugShootCop(): { hit: boolean; killed: boolean; copAlive: boolean } {
+    if (this.footCops.cops.length === 0) return { hit: false, killed: false, copAlive: true };
+    const cop = this.footCops.cops[0];
+    this.weaponAimOrigin.set(cop.position.x, 1.4, cop.position.z - 5);
+    this.weaponAimDir.set(0, 0, 1);
+    this.player.position.set(cop.position.x, 0, cop.position.z - 5);
+    const hit = this.weapons.hitscan(this.weaponAimOrigin, this.weaponAimDir, 20);
+    const wasCopHit = hit.kind === 'cop' && hit.cop === cop;
+    const killed = cop.damage(100);
+    return { hit: wasCopHit, killed, copAlive: cop.alive };
+  }
+
+  /** Used by tests to inspect signal cycles. */
+  debugTrafficCycles(): { downtown: number; outer: number } {
+    const centerNode = this.city.roads.nodes[24];
+    const outerNode = this.city.roads.nodes[0];
+    return {
+      downtown: centerNode?.cycleLength ?? 14,
+      outer: outerNode?.cycleLength ?? 14,
     };
   }
 

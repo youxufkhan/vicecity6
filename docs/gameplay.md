@@ -83,6 +83,7 @@ distracts them. They flee (and leave the loop) when:
 - the player is within 14 m
 - a gun is fired within 26 m
 - the player's car or the horn comes close
+- any traffic vehicle approaches at speed (> 3.5 m/s within 8.5 m)
 
 A pedestrian hit by a car at over 3 m/s is knocked down and dies; if the
 driver was the player, that is a crime (heat). If an AI driver hit them, it is
@@ -96,17 +97,19 @@ further than 190 m away are recycled.
 Two kinds of officer:
 
 **Cruisers** — spawned when the wanted level is higher than the number of
-units on the map, 32–62 m away. `PoliceAI` chases the player directly,
-predicting their position from their velocity, with wall avoidance: a short
-raycast ahead detects a building and biases the steering toward the open side.
-A cruiser that gets stuck reverses and re-aims.
+units on the map, 32–62 m away. Featuring procedural black-and-white cruiser
+liveries with red and blue strobe lightbars. `PoliceAI` chases the player
+directly, predicting their position from their velocity, with wall avoidance:
+a short raycast ahead detects a building and biases the steering toward the open
+side. A cruiser that gets stuck reverses and re-aims.
 
 **Officers on foot** (`FootCop.ts`) — from two stars. They spawn 26–48 m away,
 walk toward the player, stop at about 11 m, raise their sidearm and fire every
 1.1–1.9 s. The hit chance falls with distance (50 % at point blank down to
 about 24 % at 26 m). If an officer gets within 2.6 m of an on-foot player, the
-player is busted. There is a 3.5 s grace period after the heat rises so you
-always get a chance to run.
+player is busted. They can be engaged in combat with weapons or run over with
+vehicles, and drop bounties when eliminated. There is a 3.5 s grace period
+after the heat rises so you always get a chance to run.
 
 ## Combat
 

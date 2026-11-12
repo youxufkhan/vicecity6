@@ -3,6 +3,7 @@ import type { CollisionWorld } from './Collision';
 import type { Effects } from './Effects';
 import type { AudioSystem } from './Audio';
 import type { Pedestrian } from '../entities/Pedestrian';
+import type { FootCop } from '../entities/FootCop';
 import type { Vehicle } from '../entities/Vehicle';
 import { clamp01 } from '../core/MathUtil';
 
@@ -100,14 +101,16 @@ export interface HitResult {
   x: number;
   y: number;
   z: number;
-  kind: 'none' | 'building' | 'ped' | 'vehicle' | 'ground';
+  kind: 'none' | 'building' | 'ped' | 'cop' | 'vehicle' | 'ground';
   ped?: Pedestrian;
+  cop?: FootCop;
   vehicle?: Vehicle;
 }
 
 export interface WeaponContext {
   world: CollisionWorld;
   peds: Pedestrian[];
+  cops: FootCop[];
   vehicles: Vehicle[];
   effects: Effects;
   audio: AudioSystem;
@@ -115,6 +118,7 @@ export interface WeaponContext {
   aimOrigin: THREE.Vector3;
   aimDir: THREE.Vector3;
   onPedHit(ped: Pedestrian, damage: number, killed: boolean): void;
+  onCopHit(cop: FootCop, damage: number, killed: boolean): void;
   onVehicleHit(vehicle: Vehicle, damage: number): void;
   onShot(weapon: WeaponDef): void;
 }
@@ -247,6 +251,10 @@ export class WeaponSystem {
         const killed = hit.ped.damage(def.damage);
         ctx.effects.blood(end.x, end.y, end.z);
         ctx.onPedHit(hit.ped, def.damage, killed);
+      } else if (hit.kind === 'cop' && hit.cop) {
+        const killed = hit.cop.damage(def.damage);
+        ctx.effects.blood(end.x, end.y, end.z);
+        ctx.onCopHit(hit.cop, def.damage, killed);
       } else if (hit.kind === 'vehicle' && hit.vehicle) {
         hit.vehicle.applyDamage(def.damage * 0.7);
         ctx.effects.sparks(end.x, end.y, end.z, 6);
@@ -297,6 +305,28 @@ export class WeaponSystem {
         z: origin.z + dir.z * along,
         kind: 'ped',
         ped,
+      };
+    }
+
+    // Officers on foot (vertical cylinders).
+    for (const cop of ctx.cops) {
+      if (!cop.alive) continue;
+      const dx = cop.position.x - origin.x;
+      const dz = cop.position.z - origin.z;
+      const along = dx * dir.x + dz * dir.z;
+      if (along < 0 || along > best.distance) continue;
+      const lateral = Math.abs(-dx * dir.z + dz * dir.x);
+      if (lateral > 0.55) continue;
+      const height = origin.y + dir.y * along;
+      if (height > 1.9 || height < -0.2) continue;
+      best = {
+        hit: true,
+        distance: along,
+        x: origin.x + dir.x * along,
+        y: height,
+        z: origin.z + dir.z * along,
+        kind: 'cop',
+        cop,
       };
     }
 

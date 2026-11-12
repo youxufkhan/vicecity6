@@ -130,11 +130,10 @@ wrong somewhere else.
 ## Known limitations
 
 - There is no interior geometry — every building is a solid volume.
-- Pedestrians do not react to traffic, only to the player.
-- Police on foot cannot be killed by the player (they have no hitbox entry).
-- The traffic light cycle is fixed at 14 s per axis; it does not vary by
-  intersection density.
-- Audio is unlocked by the first click; a browser that blocks the
-  `AudioContext` silently mutes the game until the next gesture.
-- The game is keyboard-and-mouse first; touch support exists but has not been
-  tuned.
+- The game is keyboard-and-mouse first; touch support exists but has not been tuned.
+
+### Resolved limitations
+- **Pedestrian traffic awareness** — pedestrians detect approaching vehicles (>3.5 m/s within 8.5 m) and flee to avoid being run over.
+- **Foot police combat & hitboxes** — officers on foot have full cylinder hitboxes, take bullet damage, can be eliminated or run over, and drop cash bounties when eliminated.
+- **Dynamic traffic light cycles** — signal durations dynamically scale from 17 s in the dense downtown core to 11 s along outer districts.
+- **Resilient audio resume** — AudioContext automatically initializes or resumes across keydown, pointerdown, and touchstart gestures, preventing silent audio context lockouts.

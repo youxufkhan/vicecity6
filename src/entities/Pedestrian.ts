@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { CollisionWorld } from '../systems/Collision';
+import type { Vehicle } from './Vehicle';
 import { dist2D, rngFrom, type Rng } from '../core/MathUtil';
 
 type PedState = 'walk' | 'flee' | 'stunned' | 'dead';
@@ -372,7 +373,7 @@ export class PedManager {
     return ped;
   }
 
-  update(dt: number, world: CollisionWorld, playerX: number, playerZ: number): void {
+  update(dt: number, world: CollisionWorld, playerX: number, playerZ: number, vehicles?: Vehicle[]): void {
     for (let i = this.peds.length - 1; i >= 0; i--) {
       const ped = this.peds[i];
       const dist = dist2D(ped.position.x, ped.position.z, playerX, playerZ);
@@ -384,9 +385,21 @@ export class PedManager {
         continue;
       }
 
-      // Flee from gunfire and from the player's vehicle.
+      // Flee from gunfire, from the player, and from approaching traffic vehicles.
       if (ped.state !== 'dead' && ped.state !== 'stunned') {
-        if (dist < 14) ped.fleeFrom(playerX, playerZ);
+        if (dist < 14) {
+          ped.fleeFrom(playerX, playerZ);
+        } else if (vehicles) {
+          for (let v = 0; v < vehicles.length; v++) {
+            const car = vehicles[v];
+            if (Math.abs(car.forwardSpeed) < 3.5) continue;
+            const carDist = dist2D(ped.position.x, ped.position.z, car.position.x, car.position.z);
+            if (carDist < 8.5) {
+              ped.fleeFrom(car.position.x, car.position.z);
+              break;
+            }
+          }
+        }
       }
 
       ped.update(dt, world, this.blockCenters, this.rng);

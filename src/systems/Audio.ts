@@ -45,9 +45,24 @@ export class AudioSystem {
 
   volume = 0.7;
   musicEnabled = true;
+  private unlockAttached = false;
+
+  private attachAutoUnlock(): void {
+    if (this.unlockAttached || typeof window === 'undefined') return;
+    this.unlockAttached = true;
+    const unlock = () => {
+      if (this.ctx && this.ctx.state === 'suspended') {
+        void this.ctx.resume();
+      }
+    };
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('keydown', unlock, { passive: true });
+    window.addEventListener('touchstart', unlock, { passive: true });
+  }
 
   /** Create (or resume) the audio context. Must be called from a user gesture. */
   init(): void {
+    this.attachAutoUnlock();
     if (this.ctx) {
       if (this.ctx.state === 'suspended') void this.ctx.resume();
       return;
@@ -111,6 +126,9 @@ export class AudioSystem {
   /* ─────────────────── one shot sounds ─────────────────── */
 
   play(name: SfxName): void {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      void this.ctx.resume();
+    }
     const ctx = this.ctx;
     const bus = this.sfxBus;
     if (!ctx || !bus) return;

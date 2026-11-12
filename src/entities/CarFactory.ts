@@ -282,14 +282,34 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
   geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
 
   if (livery === 'police') {
-    // Dark side panels for a black-and-white cruiser look.
+    // Dark side panels for a black-and-white cruiser look, plus red/blue roof lightbar.
+    const roofY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.55;
     const stripe = mergeParts([
       boxGeo(spec.width * 1.01, spec.bodyHeight * 0.34, spec.length * 0.42, 0, spec.bodyBottom + spec.bodyHeight * 0.52, 0.1),
     ]);
     applyColor(stripe, new THREE.Color('#1a1f27'));
-    const merged = mergeGeometries([geo, stripe], false)!;
+
+    const redBar = mergeParts([
+      boxGeo(spec.cabinWidth * 0.35, 0.12, 0.24, -spec.cabinWidth * 0.22, roofY, spec.cabinZ),
+    ]);
+    applyColor(redBar, new THREE.Color('#ff2244'));
+
+    const blueBar = mergeParts([
+      boxGeo(spec.cabinWidth * 0.35, 0.12, 0.24, spec.cabinWidth * 0.22, roofY, spec.cabinZ),
+    ]);
+    applyColor(blueBar, new THREE.Color('#0088ff'));
+
+    const mount = mergeParts([
+      boxGeo(spec.cabinWidth * 0.78, 0.05, 0.14, 0, roofY - 0.06, spec.cabinZ),
+    ]);
+    applyColor(mount, new THREE.Color('#14171d'));
+
+    const merged = mergeGeometries([geo, stripe, redBar, blueBar, mount], false)!;
     geo.dispose();
     stripe.dispose();
+    redBar.dispose();
+    blueBar.dispose();
+    mount.dispose();
     return merged;
   }
   if (livery === 'taxi') {

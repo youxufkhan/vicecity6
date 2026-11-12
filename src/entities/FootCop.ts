@@ -25,6 +25,7 @@ export class FootCop {
   yaw = 0;
   health = 100;
   alive = true;
+  deadTimer = 0;
   fireTimer = 1.2;
   private legL = new THREE.Group();
   private legR = new THREE.Group();
@@ -93,13 +94,16 @@ export class FootCop {
     this.armR.add(gun);
   }
 
-  damage(amount: number): void {
+  damage(amount: number): boolean {
+    if (!this.alive) return false;
     this.health -= amount;
     if (this.health <= 0) {
       this.alive = false;
       this.group.rotation.x = -Math.PI / 2;
       this.group.position.y = 0.4;
+      return true;
     }
+    return false;
   }
 
   /**
@@ -112,7 +116,10 @@ export class FootCop {
     playerPos: THREE.Vector3,
     effects: { tracer: (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => void; sparks: (x: number, y: number, z: number, n: number) => void },
   ): number {
-    if (!this.alive) return 0;
+    if (!this.alive) {
+      this.deadTimer += dt;
+      return 0;
+    }
 
     const dx = playerPos.x - this.position.x;
     const dz = playerPos.z - this.position.z;
@@ -205,12 +212,35 @@ export class FootCopManager {
 
   /** Keep the number of officers in line with the wanted level. */
   maintain(count: number, playerX: number, playerZ: number): void {
-    while (this.cops.length < count) {
+    // Clean up dead officers that have lingered or cops that are too far away.
+    for (let i = this.cops.length - 1; i >= 0; i--) {
+      const cop = this.cops[i];
+      const dist = cop.distanceToPlayer(playerX, playerZ);
+      if ((!cop.alive && cop.deadTimer > 15) || dist > 190) {
+        this.scene.remove(cop.group);
+        cop.dispose();
+        this.cops.splice(i, 1);
+      }
+    }
+
+    const liveCount = this.cops.filter((c) => c.alive).length;
+    while (liveCount < count && this.cops.length < count + 3) {
       const angle = Math.random() * Math.PI * 2;
       const dist = 26 + Math.random() * 22;
       this.spawn(playerX + Math.cos(angle) * dist, playerZ + Math.sin(angle) * dist);
+      break;
     }
-    while (this.cops.length > count) {
+    while (this.cops.length > count && this.cops.some((c) => !c.alive)) {
+      const deadIdx = this.cops.findIndex((c) => !c.alive);
+      if (deadIdx >= 0) {
+        const cop = this.cops.splice(deadIdx, 1)[0];
+        this.scene.remove(cop.group);
+        cop.dispose();
+      } else {
+        break;
+      }
+    }
+    while (this.cops.length > count + 2) {
       const cop = this.cops.pop();
       if (cop) {
         this.scene.remove(cop.group);
