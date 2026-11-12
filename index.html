@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#07060d" />
+    <meta name="description" content="Vice City 6 — a neon-noir open world action sandbox." />
+    <title>VICE CITY 6 — Neon Coast</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2307060d'/%3E%3Cpath d='M6 22h20M9 22V10l7-4 7 4v12' stroke='%23ff2e88' stroke-width='2.2' fill='none'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+
+      <!-- ══════════════ HUD ══════════════ -->
+      <div id="hud" class="hud" aria-hidden="true">
+        <div id="damage-flash" class="damage-flash"></div>
+        <div id="wanted-flash" class="wanted-flash"></div>
+
+        <div class="hud-top-left">
+          <div class="clock">
+            <span id="clock-time">09:12</span>
+            <span id="clock-day">MONDAY</span>
+          </div>
+        </div>
+
+        <div class="hud-top-right">
+          <div id="wanted" class="wanted" aria-label="Wanted level">
+            <span class="wanted-star" data-star="1">★</span
+            ><span class="wanted-star" data-star="2">★</span
+            ><span class="wanted-star" data-star="3">★</span
+            ><span class="wanted-star" data-star="4">★</span
+            ><span class="wanted-star" data-star="5">★</span>
+          </div>
+          <div id="money" class="money">$0</div>
+          <div class="bars">
+            <div class="bar bar-health"><i id="health-fill"></i><span class="bar-label">HP</span></div>
+            <div class="bar bar-armor"><i id="armor-fill"></i><span class="bar-label">AP</span></div>
+          </div>
+        </div>
+
+        <div id="mission-banner" class="mission-banner">
+          <div class="mission-kicker" id="mission-kicker">MISSION</div>
+          <div class="mission-title" id="mission-title">—</div>
+          <div class="mission-objective" id="mission-objective"></div>
+        </div>
+
+        <div id="toasts" class="toasts"></div>
+
+        <div class="hud-bottom-left">
+          <canvas id="radar" width="240" height="240"></canvas>
+          <div class="radar-frame"></div>
+        </div>
+
+        <div class="hud-bottom-right">
+          <canvas id="speedo" width="190" height="190"></canvas>
+          <div class="weapon">
+            <span class="weapon-icon" id="weapon-icon">🔫</span>
+            <span class="weapon-name" id="weapon-name">UNARMED</span>
+            <span class="ammo" id="ammo">—</span>
+          </div>
+        </div>
+
+        <div id="crosshair" class="crosshair"><i></i><i></i><i></i><i></i></div>
+        <div id="prompt" class="prompt"></div>
+        <div id="speed-lines" class="speed-lines"></div>
+
+        <div id="worldmap" class="worldmap">
+          <canvas id="worldmap-canvas" width="880" height="620"></canvas>
+          <div class="worldmap-frame">
+            <span class="worldmap-title">VICE COUNTY</span>
+            <span class="worldmap-hint">M / ESC — close</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ TOUCH ══════════════ -->
+      <div id="touch" class="touch" aria-hidden="true">
+        <div id="stick" class="stick"><i id="stick-knob"></i></div>
+        <div class="touch-buttons">
+          <button class="touch-btn" data-touch="action">E</button>
+          <button class="touch-btn" data-touch="run">▶▶</button>
+          <button class="touch-btn touch-btn-fire" data-touch="fire">FIRE</button>
+        </div>
+      </div>
+
+      <!-- ══════════════ SCREENS ══════════════ -->
+      <div id="screens" class="screens">
+        <!-- Title -->
+        <section class="screen screen-title is-active" data-screen="title">
+          <div class="title-bg-grid"></div>
+          <div class="title-sun"></div>
+          <div class="title-wrap">
+            <p class="eyebrow">Neon Coast · Vice County · Open World</p>
+            <h1 class="game-title"><span>VICE</span><em>CITY</em><b>6</b></h1>
+            <p class="tagline">Steal the car. Take the money. Outrun the lights.</p>
+            <div class="menu-buttons">
+              <button class="btn btn-primary" data-action="start">START GAME</button>
+              <button class="btn" data-action="controls">CONTROLS</button>
+              <button class="btn" data-action="settings">SETTINGS</button>
+            </div>
+            <p class="build-tag">Three.js sandbox build · v1.0.0</p>
+          </div>
+        </section>
+
+        <!-- Controls -->
+        <section class="screen screen-panel" data-screen="controls">
+          <div class="panel">
+            <h2>CONTROLS</h2>
+            <div class="keys">
+              <div class="key-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Move / Drive</span></div>
+              <div class="key-row"><kbd>Shift</kbd><span>Sprint (on foot)</span></div>
+              <div class="key-row"><kbd>Space</kbd><span>Handbrake (in car)</span></div>
+              <div class="key-row"><kbd>E</kbd><span>Enter / exit vehicle</span></div>
+              <div class="key-row"><kbd>Mouse</kbd><span>Look around</span></div>
+              <div class="key-row"><kbd>Right&nbsp;Mouse</kbd><span>Aim weapon</span></div>
+              <div class="key-row"><kbd>Left&nbsp;Mouse</kbd><span>Fire</span></div>
+              <div class="key-row"><kbd>R</kbd><span>Reload</span></div>
+              <div class="key-row"><kbd>Q</kbd><span>Switch weapon</span></div>
+              <div class="key-row"><kbd>H</kbd><span>Horn</span></div>
+              <div class="key-row"><kbd>M</kbd><span>Expand map</span></div>
+              <div class="key-row"><kbd>Esc</kbd><span>Pause / release mouse</span></div>
+            </div>
+            <button class="btn btn-primary" data-action="back">BACK</button>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="screen screen-panel" data-screen="settings">
+          <div class="panel">
+            <h2>SETTINGS</h2>
+            <label class="setting">
+              <span>Graphics quality</span>
+              <select id="set-quality">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <label class="setting">
+              <span>Shadows</span>
+              <input type="checkbox" id="set-shadows" />
+            </label>
+            <label class="setting">
+              <span>Music &amp; effects volume</span>
+              <input type="range" id="set-volume" min="0" max="100" step="1" />
+            </label>
+            <label class="setting">
+              <span>Invert look Y</span>
+              <input type="checkbox" id="set-invert" />
+            </label>
+            <label class="setting">
+              <span>Mouse sensitivity</span>
+              <input type="range" id="set-sens" min="20" max="300" step="5" />
+            </label>
+            <button class="btn btn-primary" data-action="back">BACK</button>
+          </div>
+        </section>
+
+        <!-- Pause -->
+        <section class="screen screen-panel" data-screen="pause">
+          <div class="panel panel-narrow">
+            <h2>PAUSED</h2>
+            <div class="menu-buttons">
+              <button class="btn btn-primary" data-action="resume">RESUME</button>
+              <button class="btn" data-action="controls">CONTROLS</button>
+              <button class="btn" data-action="settings">SETTINGS</button>
+              <button class="btn btn-danger" data-action="quit">QUIT TO TITLE</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Wasted -->
+        <section class="screen screen-wasted" data-screen="wasted">
+          <div class="wasted-wrap">
+            <h2 class="wasted-title">WASTED</h2>
+            <p class="wasted-sub" id="wasted-sub">You were busted.</p>
+            <button class="btn btn-primary" data-action="respawn">RESPAWN</button>
+          </div>
+        </section>
+
+        <!-- Mission passed -->
+        <section class="screen screen-clear" data-screen="clear">
+          <div class="clear-wrap">
+            <h2 class="clear-title">MISSION PASSED</h2>
+            <p class="clear-sub" id="clear-sub"></p>
+            <button class="btn btn-primary" data-action="continue">CONTINUE</button>
+          </div>
+        </section>
+
+        <!-- Click to play -->
+        <div id="click-to-play" class="click-to-play"><span>CLICK TO PLAY</span></div>
+      </div>
+
+      <div id="boot" class="boot"><div class="boot-inner"><div class="boot-bar"><i></i></div><p>BUILDING NEON COAST…</p></div></div>
+      <div id="fatal" class="fatal" hidden></div>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

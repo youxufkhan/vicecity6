@@ -1,0 +1,26 @@
+{
+  "name": "gta6",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Vice City style open-world action game built with Three.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "npm run build && node scripts/smoke.mjs",
+    "tour": "node scripts/tour.mjs",
+    "test:behaviour": "node scripts/behaviour.mjs",
+    "test": "npm run build && node scripts/smoke.mjs && node scripts/behaviour.mjs"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.169.0",
+    "puppeteer-core": "^23.6.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
