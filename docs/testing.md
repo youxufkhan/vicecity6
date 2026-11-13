@@ -47,6 +47,10 @@ signal.
 
 | Assertion | Why it matters |
 | --- | --- |
+| A key press survives a render without a simulation step and fires once on catch-up | Input works across refresh rates |
+| Traffic stops behind the painted line and resumes on green | AI and street geometry agree |
+| Cruisers spawn on clear roads and AI crashes add no heat | Police spawn and crime attribution work |
+| Touch Use enters and exits the car and Fire spends one pistol round | Touch controls are wired through gameplay |
 | Traffic stays on the road (≤ 4 of 20 briefly off) | Lane following works |
 | Traffic keeps moving (average speed > 1 m/s) | Cars are not permanently stuck |
 | Pedestrians stay on the pavement (≤ 8 on the road) | The sidewalk path works |

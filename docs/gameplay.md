@@ -17,7 +17,8 @@ movement controller and the vitals (health, armour, money).
 
 **Driving**
 
-- `E` near a vehicle gets in, `E` while below 6 m/s gets out.
+- `E` near an accessible, operable vehicle gets in. Below 6 m/s, `E` gets
+  out through whichever side has room.
 - Taking the wheel of a car in front of police adds one star of heat.
 - The character rig is hidden while driving and re-anchored beside the car on
   exit.
@@ -73,12 +74,15 @@ See [algorithms.md](algorithms.md) for the physics model.
 4. **Speed.** The target speed is 17 m/s, dropping to 7 or 4 m/s in tight
    turns. It is further reduced by the traffic light, by a vehicle ahead, and
    by the need to slow for a corner.
-5. **Traffic lights.** If the light for the car's axis is red and the stop
-   distance is under 16 m, the target speed becomes `stopDistance * 0.75`.
+5. **Traffic lights.** Cars measure the gap from the front bumper to the
+   painted stop line. They slow to a stop on red and stop on amber when
+   there is enough room to brake.
 6. **Car following.** Any vehicle within 25 m ahead, within 2.8 m laterally and
    heading roughly the same way reduces the target speed to
    `(gap - 5.5) * 1.1`.
-7. **Unstick.** A car that cannot move for 2.4 s reverses with opposite lock.
+7. **Unstick.** A car that cannot move for 2.4 s holds one steering direction
+   while reversing for 0.9 s. Route choices use a seeded per-car generator
+   and favor continuing straight.
 
 Cars spawn **in the correct lane, pointing down the road**, on a random edge
 mid-block. Spawning them on the centre line with a random heading was the
@@ -110,7 +114,7 @@ further than 190 m away are recycled.
 Two kinds of officer:
 
 **Cruisers** — spawned when the wanted level is higher than the number of
-units on the map, 32–62 m away. Featuring procedural black-and-white cruiser
+units on the map, in clear travel lanes 32–82 m away. Featuring procedural black-and-white cruiser
 liveries with red and blue strobe lightbars and heavy-duty front bullbars. `PoliceAI` chases the player
 directly, predicting their position from their velocity, with wall avoidance:
 a short raycast ahead detects a building and biases the steering toward the open
@@ -143,6 +147,7 @@ points the player where the camera looks. Shooting uses the camera ray to pick
 an aim point on the chest plane, then fires from the player's muzzle towards
 that point, so the crosshair is truthful in third person.
 
+The pistol and shotgun fire once per press. The SMG keeps firing while held.
 The player starts with a pistol and 48 rounds in reserve. Weapon pickups are
 scattered around the city.
 

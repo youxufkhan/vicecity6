@@ -115,19 +115,11 @@ export class Vehicle {
 
     // Rolling resistance and drag.
     const drag = 0.6 + 0.0022 * forwardSpeed * forwardSpeed;
-    if (this.throttle === 0 || Math.sign(forwardSpeed) !== Math.sign(this.throttle)) {
-      forwardSpeed -= Math.sign(forwardSpeed) * drag * dt;
-    }
-    if (this.handbrake) forwardSpeed -= Math.sign(forwardSpeed) * 11 * dt;
-    if (Math.abs(forwardSpeed) < 0.12 && Math.abs(this.throttle) < 0.01) forwardSpeed = 0;
-
-    // ── lateral grip (handbrake breaks traction) ──
+    const rolling = this.throttle === 0 || Math.sign(forwardSpeed) !== Math.sign(this.throttle);
     const grip = this.handbrake ? 2.4 : spec.grip;
     lateral *= Math.exp(-grip * dt);
-    if (this.handbrake && Math.abs(lateral) > 0.1) {
-      // Scrub speed while sliding.
-      forwardSpeed -= Math.sign(forwardSpeed) * Math.abs(lateral) * 0.32 * dt;
-    }
+    const resistance = (rolling ? drag : 0) + (this.handbrake ? 11 + Math.abs(lateral) * 0.32 : 0);
+    forwardSpeed = Math.sign(forwardSpeed) * Math.max(0, Math.abs(forwardSpeed) - resistance * dt);
 
     // ── steering ──
     const speedFactor = clamp01(Math.abs(forwardSpeed) / 5.5);
@@ -239,8 +231,11 @@ export interface VehicleAI {
   update(vehicle: Vehicle, dt: number): void;
 }
 
-/** Resolve collisions between vehicles using two-circle approximations. */
-export function resolveVehiclePairs(vehicles: Vehicle[]): void {
+/** Resolve collisions between vehicles using a circle for each vehicle. */
+export function resolveVehiclePairs(
+  vehicles: Vehicle[],
+  onImpact?: (a: Vehicle, b: Vehicle, speed: number) => void,
+): void {
   for (let i = 0; i < vehicles.length; i++) {
     const a = vehicles[i];
     for (let j = i + 1; j < vehicles.length; j++) {
@@ -277,6 +272,7 @@ export function resolveVehiclePairs(vehicles: Vehicle[]): void {
 
       const impact = Math.abs(vn);
       if (impact > 4) {
+        onImpact?.(a, b, impact);
         a.applyDamage(impact * 0.55);
         b.applyDamage(impact * 0.55);
         a.lastImpactSpeed = Math.max(a.lastImpactSpeed, impact);

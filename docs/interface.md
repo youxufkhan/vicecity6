@@ -96,7 +96,8 @@ have their own synthesised sounds.
 
 ## Touch controls
 
-On a touch device (`'ontouchstart' in window`) an on-screen stick and three
-buttons appear. The stick feeds the same virtual axes the keyboard feeds, and
-the buttons map to action / run / fire. The HUD shifts to a phone layout under
-620 px.
+On a coarse-pointer touch device, the stick moves or steers and dragging the
+canvas moves the camera. **Use** enters or exits a vehicle, the sprint button
+becomes the handbrake while driving, and **Fire** aims and shoots. Touch play
+starts directly without requesting pointer lock. The HUD shifts to a phone
+layout under 620 px.

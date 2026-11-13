@@ -2,8 +2,8 @@
  * Keyboard / mouse / touch input.
  *
  * - `down(code)`     : held this frame
- * - `pressed(code)`  : went down this frame (consumed by `endFrame`)
- * - `lookX/lookY`    : accumulated mouse/touch delta since last frame
+ * - `pressed(code)`  : went down since the last simulation step
+ * - `lookX/lookY`    : accumulated mouse/touch delta since the last simulation step
  * - Touch controls write into the same virtual axes so gameplay code never
  *   needs to know whether the player is on a keyboard or a phone.
  */
@@ -174,8 +174,8 @@ export class Input {
     }
   }
 
-  /** Call once at the end of every rendered frame. */
-  endFrame(): void {
+  /** Consume transient input after a simulation step. */
+  endStep(): void {
     this.pressedSet.clear();
     this.releasedSet.clear();
     this.mousePressed.clear();
@@ -213,6 +213,8 @@ export class Input {
     this.held.clear();
     this.mouseButtons = 0;
     this.touchButtons.clear();
+    this.setTouchMove(0, 0);
+    this.endStep();
   };
 
   private onVisibility = (): void => {
@@ -232,11 +234,13 @@ export class Input {
 
   private onMouseMove = (e: MouseEvent): void => {
     if (!this.enabled) return;
-    if (this.pointerLocked) {
-      this.lookX += e.movementX * 0.0022 * this.sensitivity;
-      this.lookY += e.movementY * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1);
-    }
+    if (this.pointerLocked) this.addLook(e.movementX, e.movementY);
   };
+
+  addLook(dx: number, dy: number): void {
+    this.lookX += dx * 0.0022 * this.sensitivity;
+    this.lookY += dy * 0.0022 * this.sensitivity * (this.invertY ? -1 : 1);
+  }
 
   private onWheel = (e: WheelEvent): void => {
     if (!this.enabled) return;

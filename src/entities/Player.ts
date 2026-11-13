@@ -496,17 +496,21 @@ export class Player {
     this.group.visible = !this.isDriving;
   }
 
-  /** Place the player next to a vehicle when they get in or out. */
-  placeBeside(vehicle: Vehicle, side: number): void {
-    const fx = Math.sin(vehicle.yaw);
-    const fz = Math.cos(vehicle.yaw);
-    const rx = -fz;
-    const rz = fx;
+  /** Try both doors, using the building collision radius for clearance. */
+  placeBeside(vehicle: Vehicle, world: CollisionWorld): boolean {
+    const rx = -Math.cos(vehicle.yaw);
+    const rz = Math.sin(vehicle.yaw);
     const offset = vehicle.spec.width * 0.5 + 0.75;
-    this.position.x = vehicle.position.x + rx * side * offset;
-    this.position.z = vehicle.position.z + rz * side * offset;
-    this.position.y = 0;
-    this.velocity.set(0, 0, 0);
+    for (const side of [1, -1]) {
+      const x = vehicle.position.x + rx * side * offset;
+      const z = vehicle.position.z + rz * side * offset;
+      if (world.overlaps(x, z, this.radius)) continue;
+      this.position.set(x, 0, z);
+      this.velocity.set(0, 0, 0);
+      this.onGround = true;
+      return true;
+    }
+    return false;
   }
 
   setVisible(visible: boolean): void {

@@ -30,7 +30,8 @@ half power below 0.4 m/s, capped at 34 % of the top speed in reverse.
 
 **3. Resistance.** Rolling and aerodynamic drag: `0.6 + 0.0022 * v²`, applied
 only when the throttle is off or fighting the current direction. The handbrake
-adds a further 11 m/s² of retardation.
+adds a further 11 m/s² of retardation. Resistance is clamped at zero speed so
+it cannot push a nearly stopped car into reverse.
 
 **4. Lateral grip.** The lateral velocity is damped exponentially:
 

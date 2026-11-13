@@ -16,6 +16,8 @@ import {
   HALF_Z,
   BEACH_DEPTH,
   ROAD_WIDTH,
+  LANE_OFFSET,
+  STOP_LINE_OFFSET,
   SIDEWALK_WIDTH,
   buildBlocks,
   roadCenterX,
@@ -393,25 +395,24 @@ export function buildCity(seed = 20261113): City {
     for (let col = 0; col < 7; col++) {
       const x = roadCenterX(col);
       const z = roadCenterZ(row);
-      // Zebra crossings on all four approaches.
-      for (let i = 0; i < 3; i++) {
-        const offset = ROAD_WIDTH / 2 + 1.8 + i * 1.4;
-        for (const sign of [-1, 1]) {
-          markGeos.push(makeRectXZ(x + sign * offset, z, 0.7, ROAD_WIDTH - 2.4, 0.05));
-          markGeos.push(makeRectXZ(x, z + sign * offset, ROAD_WIDTH - 2.4, 0.7, 0.05));
+      const crossing = ROAD_WIDTH / 2 + 4;
+      for (const side of [-1, 1]) {
+        // Stripes run in the direction of travel, repeated across the carriageway.
+        for (let stripe = -5; stripe <= 5; stripe++) {
+          const across = stripe * 1.25;
+          markGeos.push(makeRectXZ(x + side * crossing, z + across, 3.2, 0.65, 0.05));
+          markGeos.push(makeRectXZ(x + across, z + side * crossing, 0.65, 3.2, 0.05));
         }
+        markGeos.push(makeRectXZ(x + side * STOP_LINE_OFFSET, z - side * LANE_OFFSET, 0.42, 6.8, 0.05));
+        markGeos.push(makeRectXZ(x + side * LANE_OFFSET, z + side * STOP_LINE_OFFSET, 6.8, 0.42, 0.05));
       }
-      // Stop lines on the right-hand lane of each approach.
-      markGeos.push(makeRectXZ(x + ROAD_WIDTH / 2 + 8.5, z + 4.2, 0.5, 5.4, 0.05));
-      markGeos.push(makeRectXZ(x + 4.2, z + ROAD_WIDTH / 2 + 8.5, 5.4, 0.5, 0.05));
-      markGeos.push(makeRectXZ(x - ROAD_WIDTH / 2 - 8.5, z - 4.2, 0.5, 5.4, 0.05));
-      markGeos.push(makeRectXZ(x - 4.2, z - ROAD_WIDTH / 2 - 8.5, 5.4, 0.5, 0.05));
     }
   }
   const markMesh = new THREE.Mesh(
     mergeAll(markGeos)!,
     new THREE.MeshStandardMaterial({ color: white, roughness: 0.7, metalness: 0 }),
   );
+  markMesh.receiveShadow = true;
   group.add(markMesh);
 
   /* ─────────────── buildings ─────────────── */

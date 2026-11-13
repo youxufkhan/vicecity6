@@ -195,7 +195,7 @@ export class WeaponSystem {
     }
 
     if (wantReload) this.reload();
-    if (!wantFire) return;
+    if (!wantFire || this.reloading > 0 || this.cooldown > 0) return;
 
     const def = this.def;
     if (def.id === 'unarmed') {
@@ -207,7 +207,6 @@ export class WeaponSystem {
       this.reload();
       return;
     }
-    if (this.cooldown > 0) return;
     this.cooldown = 60 / def.rpm;
     this.magazine[def.id] -= 1;
     this.fire();

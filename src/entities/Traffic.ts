@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { CollisionWorld } from '../systems/Collision';
 import { angleDelta, clamp, clamp01, dist2D, rngFrom, type Rng } from '../core/MathUtil';
-import { LANE_OFFSET, ROAD_WIDTH, type RoadNetwork } from '../world/Layout';
+import { LANE_OFFSET, STOP_LINE_OFFSET, type RoadNetwork } from '../world/Layout';
 import { CAR_SPECS, CIVIL_PAINT, type CarSpec } from './CarFactory';
 import { Vehicle, type VehicleAI } from './Vehicle';
 
@@ -18,16 +18,18 @@ export class TrafficAI implements VehicleAI {
   /** True while the AI is waiting at a red light. */
   stopped = false;
   private stuckTimer = 0;
+  private reverseTimer = 0;
+  private reverseSteer = 0;
   private rng: Rng;
   /** Game clock, used for traffic light timing. */
   time = 0;
   /** Smoothed steering so the cars do not saw between the wheels. */
   private steerValue = 0;
 
-  constructor(private roads: RoadNetwork, startNode: number, toNode?: number) {
-    this.rng = rngFrom(startNode * 7919 + 13);
+  constructor(private roads: RoadNetwork, startNode: number, toNode?: number, seed = startNode * 7919 + 13) {
+    this.rng = rngFrom(seed);
     this.from = startNode;
-    this.to = toNode ?? this.roads.otherEnd(this.roads.nextEdge(startNode, null), startNode);
+    this.to = toNode ?? this.roads.otherEnd(this.roads.nextEdge(startNode, null, this.rng), startNode);
   }
 
   update(vehicle: Vehicle, dt: number): void {
@@ -37,7 +39,7 @@ export class TrafficAI implements VehicleAI {
 
     // Choose the next edge shortly before the intersection.
     if (this.nextEdge < 0 && distToNode < 24) {
-      const edge = this.roads.nextEdge(this.to, this.edgeInto(this.to));
+      const edge = this.roads.nextEdge(this.to, this.edgeInto(this.to), this.rng);
       this.nextEdge = edge;
       const dir = this.roads.edgeDirection(edge, this.to);
       const rx = -dir.dz;
@@ -82,41 +84,48 @@ export class TrafficAI implements VehicleAI {
     if (Math.abs(diff) > 0.5) desiredSpeed = 7;
     if (Math.abs(diff) > 1.1) desiredSpeed = 4;
 
-    // Traffic light: stop for red.
+    // Measure from the front bumper along the approach, independent of lane offset.
     const axis = Math.abs(dir.dx) > 0.5 ? 'x' : 'z';
     const signal = this.roads.signalState(this.to, axis, this.time);
-    const stopDistance = distToNode - (ROAD_WIDTH / 2 + 3.5);
-    if (signal !== 'green' && stopDistance < 16 && stopDistance > -2) {
-      desiredSpeed = Math.min(desiredSpeed, Math.max(0, stopDistance * 0.75));
-      if (stopDistance < 0.4) desiredSpeed = 0;
+    const speed = vehicle.forwardSpeed;
+    const alongToNode = (toNode.x - pos.x) * dir.dx + (toNode.z - pos.z) * dir.dz;
+    const stopDistance = alongToNode - STOP_LINE_OFFSET - vehicle.spec.length / 2;
+    const brakingDistance = Math.max(0, speed) ** 2 / 20;
+    const shouldStop = signal === 'red' || (signal === 'yellow' && stopDistance >= brakingDistance);
+    if (shouldStop && stopDistance >= -0.25) {
+      desiredSpeed = Math.min(desiredSpeed, stopDistance < 0.45 ? 0 : Math.max(1, stopDistance * 0.95));
     }
 
     // Vehicle ahead: keep a safe gap and stop behind it.
     const ahead = this.vehicleAhead(vehicle);
-    if (ahead > 0) {
+    if (Number.isFinite(ahead)) {
       desiredSpeed = Math.min(desiredSpeed, Math.max(0, (ahead - 5.5) * 1.1));
     }
 
     // Speed control.
-    const speed = vehicle.forwardSpeed;
     let throttle = 0;
     if (speed < desiredSpeed - 0.6) throttle = clamp((desiredSpeed - speed) * 0.45, 0.25, 1);
     else if (speed > desiredSpeed + 1.2) throttle = -1;
 
     this.stopped = desiredSpeed < 0.4;
 
-    // Unstick: reverse if wedged.
-    if (Math.abs(speed) < 0.4 && desiredSpeed > 2) {
+    // Hold the same steering direction for a full recovery manoeuvre.
+    if (this.reverseTimer > 0) {
+      this.reverseTimer -= dt;
+      throttle = -0.8;
+      steer = this.reverseSteer;
+    } else if (Math.abs(speed) < 0.4 && desiredSpeed > 2) {
       this.stuckTimer += dt;
       if (this.stuckTimer > 2.4) {
-        throttle = -0.8;
-        steer = this.rng.chance(0.5) ? 0.7 : -0.7;
+        this.reverseTimer = 0.9;
+        this.reverseSteer = this.rng.chance(0.5) ? 0.7 : -0.7;
+        this.stuckTimer = 0;
       }
     } else {
       this.stuckTimer = 0;
     }
 
-    vehicle.setInput({ throttle, steer, handbrake: false });
+    vehicle.setInput({ throttle, steer, handbrake: this.stopped });
 
     // Advance to the next node.
     if (distToNode < 5.5 && this.nextEdge >= 0) {
@@ -150,7 +159,7 @@ export class TrafficAI implements VehicleAI {
       // are handled by staying in the lane.
       const otherFx = Math.sin(other.yaw);
       const otherFz = Math.cos(other.yaw);
-      if (otherFx * fx + otherFz * fz < 0.35) continue;
+      if (other.speed > 1 && otherFx * fx + otherFz * fz < 0.35) continue;
       closest = Math.min(closest, along);
     }
     return closest;
@@ -165,8 +174,6 @@ export class TrafficAI implements VehicleAI {
     const dir = this.roads.edgeDirection(this.edgeInto(this.to), this.from);
     const fromNode = this.roads.nodes[this.from];
     const len = dist2D(fromNode.x, fromNode.z, toNode.x, toNode.z);
-    const t = Math.max(0, Math.min(1, 1));
-    void t;
     return {
       from: [this.from, fromNode.x.toFixed(0), fromNode.z.toFixed(0)],
       to: [this.to, toNode.x.toFixed(0), toNode.z.toFixed(0)],
@@ -184,6 +191,7 @@ export class TrafficAI implements VehicleAI {
 export class PoliceAI implements VehicleAI {
   private stuckTimer = 0;
   private reverseTimer = 0;
+  private reverseSteer = 0;
   private rng: Rng;
 
   constructor(seed = 1) {
@@ -233,11 +241,12 @@ export class PoliceAI implements VehicleAI {
     if (this.reverseTimer > 0) {
       this.reverseTimer -= dt;
       throttle = -0.9;
-      steer = this.rng.chance(0.5) ? 0.8 : -0.8;
+      steer = this.reverseSteer;
     } else if (Math.abs(speed) < 0.6 && dist > 12) {
       this.stuckTimer += dt;
       if (this.stuckTimer > 1.6) {
         this.reverseTimer = 0.9;
+        this.reverseSteer = this.rng.chance(0.5) ? 0.8 : -0.8;
         this.stuckTimer = 0;
       }
     } else {
@@ -323,14 +332,31 @@ export class TrafficManager {
     }
   }
 
-  /** Spawn a police cruiser near a position. */
-  spawnPolice(x: number, z: number): Vehicle {
+  /** Dispatch from a nearby clear road approach. */
+  spawnPolice(x: number, z: number, world: CollisionWorld): Vehicle | null {
     const spec = CAR_SPECS.sedan;
+    const spots = this.roads.edges.flatMap((edge) => {
+      const a = this.roads.nodes[edge.a];
+      const b = this.roads.nodes[edge.b];
+      const midX = (a.x + b.x) / 2;
+      const midZ = (a.z + b.z) / 2;
+      const direction = (x - midX) * edge.dx + (z - midZ) * edge.dz >= 0 ? 1 : -1;
+      const px = midX - edge.dz * direction * LANE_OFFSET;
+      const pz = midZ + edge.dx * direction * LANE_OFFSET;
+      const distance = dist2D(x, z, px, pz);
+      if (distance < 32 || distance > 82 || world.overlaps(px, pz, spec.length / 2)) return [];
+      return [{ px, pz, yaw: Math.atan2(edge.dx * direction, edge.dz * direction) }];
+    });
+    const occupied = [...this.traffic, ...this.parked, ...this.police];
+    if (this.playerVehicle) occupied.push(this.playerVehicle);
+    const clear = spots.filter(({ px, pz }) =>
+      occupied.every((car) => dist2D(px, pz, car.position.x, car.position.z) > 7),
+    );
+    if (clear.length === 0) return null;
+    const spot = this.rng.pick(clear);
     const car = new Vehicle(spec, '#f2f2f2', 'police');
-    const angle = this.rng.range(0, Math.PI * 2);
-    const dist = this.rng.range(32, 62);
-    car.position.set(x + Math.cos(angle) * dist, 0, z + Math.sin(angle) * dist);
-    car.yaw = Math.atan2(x - car.position.x, z - car.position.z);
+    car.position.set(spot.px, 0, spot.pz);
+    car.yaw = spot.yaw;
     car.driver = 'police';
     const ai = new PoliceAI(this.rng.int(1, 9999));
     car.ai = ai;
@@ -420,7 +446,7 @@ export class TrafficManager {
         );
         car.yaw = Math.atan2(ux, uz);
         car.driver = 'ai';
-        const ai = new TrafficAI(this.roads, node.id, other);
+        const ai = new TrafficAI(this.roads, node.id, other, this.rng.int(1, 1_000_000));
         ai.roadContext = context;
         ai.time = this.time;
         car.ai = ai;

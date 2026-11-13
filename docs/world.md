@@ -128,14 +128,13 @@ the edge midpoint offset by `right * LANE_OFFSET`, where
 
 `signalState(node, axis, time)` returns `green | yellow | red`:
 
-- The cycle is **14 s per axis**, alternating X and Z, so a full cycle is 28 s.
-- The last **2.4 s** of a green phase are amber.
-- `signalOffset` (derived from the node's grid position) staggers the phases
-  across the map, so waves of green move through the city instead of flipping
-  everywhere at once.
+- Each axis gets 11–17 seconds depending on district density, including
+  a 2.4-second amber phase.
+- `signalOffset` staggers lights across the road grid.
 
-The same function drives the AI (stop at red) and the visible signal heads
-(coloured bulbs on an instanced mesh).
+The same function drives the AI and the visible signal heads. Stop lines
+sit in each inbound lane before the zebra crossing. Their offset is shared
+by the road mesh and the AI braking logic.
 
 ## Props
 

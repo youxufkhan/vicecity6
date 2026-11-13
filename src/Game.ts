@@ -72,6 +72,7 @@ export class Game {
   private weaponAimOrigin = new THREE.Vector3();
   private weaponAimDir = new THREE.Vector3(0, 0, -1);
   private weaponTargets: Vehicle[] = [];
+  private touchMode = false;
   /** Guards the pointer-lock release that happens when the map opens. */
   private mapPointerGuard = false;
   private rng = rngFrom(4242);
@@ -200,7 +201,7 @@ export class Game {
         this.audio.play('ui');
         if (this.state === 'playing' && !this.paused) {
           this.menus.setClickToPlay(false);
-          this.input.requestPointerLock();
+          this.requestPointerLock();
         }
       },
     });
@@ -243,7 +244,7 @@ export class Game {
     canvas.addEventListener('click', () => {
       if (this.state === 'playing' && !this.paused) {
         this.audio.init();
-        this.input.requestPointerLock();
+        this.requestPointerLock();
       }
     });
   }
@@ -251,6 +252,7 @@ export class Game {
   private setupTouch(): void {
     const touchRoot = document.getElementById('touch')!;
     if (!('ontouchstart' in window)) return;
+    this.touchMode = matchMedia('(pointer: coarse)').matches;
     touchRoot.classList.add('on');
 
     const stick = document.getElementById('stick')!;
@@ -259,6 +261,7 @@ export class Game {
     let origin = { x: 0, y: 0 };
 
     const onStart = (e: TouchEvent): void => {
+      if (stickId !== null) return;
       const t = e.changedTouches[0];
       stickId = t.identifier;
       const rect = stick.getBoundingClientRect();
@@ -273,7 +276,8 @@ export class Game {
         knob.style.transform = `translate(${dx * 34}px, ${dy * 34}px)`;
       }
     };
-    const onEnd = (): void => {
+    const onEnd = (e: TouchEvent): void => {
+      if (!Array.from(e.changedTouches).some((t) => t.identifier === stickId)) return;
       stickId = null;
       this.input.setTouchMove(0, 0);
       knob.style.transform = '';
@@ -283,17 +287,41 @@ export class Game {
     window.addEventListener('touchend', onEnd);
     window.addEventListener('touchcancel', onEnd);
 
-    for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-touch]'))) {
+    const canvas = this.renderer.domElement;
+    let lookId: number | null = null;
+    let lookX = 0;
+    let lookY = 0;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' || lookId !== null) return;
+      lookId = e.pointerId;
+      lookX = e.clientX;
+      lookY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== lookId) return;
+      this.input.addLook(e.clientX - lookX, e.clientY - lookY);
+      lookX = e.clientX;
+      lookY = e.clientY;
+    });
+    canvas.addEventListener('lostpointercapture', (e) => {
+      if (e.pointerId === lookId) lookId = null;
+    });
+
+    for (const button of document.querySelectorAll<HTMLButtonElement>('[data-touch]')) {
       const name = button.dataset.touch!;
-      button.addEventListener('touchstart', (e) => {
+      button.addEventListener('pointerdown', (e) => {
+        if (!e.isPrimary && e.pointerType !== 'touch') return;
         e.preventDefault();
+        button.setPointerCapture(e.pointerId);
         this.input.setTouchButton(name, true);
       });
-      button.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        this.input.setTouchButton(name, false);
-      });
+      button.addEventListener('lostpointercapture', () => this.input.setTouchButton(name, false));
     }
+  }
+
+  private requestPointerLock(): void {
+    if (!this.touchMode) this.input.requestPointerLock();
   }
 
   private applySettings(settings: Settings): void {
@@ -410,7 +438,7 @@ export class Game {
     this.state = 'playing';
     this.paused = false;
     this.hud.setVisible(true);
-    this.menus.setClickToPlay(true);
+    this.menus.setClickToPlay(!this.touchMode);
     this.missionCooldown = 1.5;
   }
 
@@ -428,7 +456,7 @@ export class Game {
     this.paused = false;
     this.menus.hide();
     this.audio.resume();
-    this.input.requestPointerLock();
+    this.requestPointerLock();
   }
 
   quitToTitle(): void {
@@ -454,7 +482,7 @@ export class Game {
     this.state = 'playing';
     this.hud.clearMission();
     this.missionCooldown = 2.5;
-    this.input.requestPointerLock();
+    this.requestPointerLock();
   }
 
   private respawn(): void {
@@ -473,7 +501,7 @@ export class Game {
     this.hud.clearMission();
     this.hud.setPrompt(null);
     this.addMoney(-Math.min(this.player.money, 500));
-    this.input.requestPointerLock();
+    this.requestPointerLock();
   }
 
   /* ─────────────────── main loop ─────────────────── */
@@ -487,16 +515,20 @@ export class Game {
       this.accumulator += dt;
       let steps = 0;
       while (this.accumulator >= STEP && steps < 5) {
-        this.update(STEP);
+        this.step(STEP);
         this.accumulator -= STEP;
         steps++;
       }
       if (steps === 5) this.accumulator = 0;
       this.render();
-      this.input.endFrame();
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
+  }
+
+  private step(dt: number): void {
+    this.update(dt);
+    this.input.endStep();
   }
 
   private update(dt: number): void {
@@ -580,10 +612,10 @@ export class Game {
     if (input.pressed('KeyM')) {
       const open = this.hud.toggleMap();
       if (open) {
-        this.mapPointerGuard = true;
+        this.mapPointerGuard = this.input.pointerLocked;
         this.input.exitPointerLock();
       } else {
-        this.input.requestPointerLock();
+        this.requestPointerLock();
       }
     }
     if (this.hud.mapOpen) {
@@ -599,17 +631,21 @@ export class Game {
       const car = this.player.vehicle!;
       const throttle = input.moveY;
       const steer = input.moveX;
-      const handbrake = input.down('Space') || input.touchDown('action');
+      const handbrake = input.down('Space') || input.touchDown('run');
       car.setInput({ throttle, steer, handbrake });
-      this.player.updateInVehicle(dt, car);
     } else {
       const running = input.down('ShiftLeft') || input.down('ShiftRight') || input.touchDown('run');
       this.player.updateOnFoot(dt, input.moveX, input.moveY, this.cameraRig.yaw, running, world);
       if (input.pressed('Space')) this.player.jump();
     }
 
+    const allVehicles = this.allVehicles();
+    this.weaponTargets.length = 0;
+    this.weaponTargets.push(...allVehicles);
+
     /* ── aiming and shooting ── */
-    const aiming = !driving && (input.mouseDown(2) || input.touchDown('fire'));
+    const touchFire = input.touchJustPressed('fire');
+    const aiming = !driving && (input.mouseDown(2) || input.touchDown('fire') || touchFire);
     this.weapons.aiming = aiming;
     this.player.setAiming(aiming, dt);
     this.player.setWeapon(this.weapons.current);
@@ -620,11 +656,13 @@ export class Game {
         const f = this.cameraRig.forward;
         this.player.yaw = Math.atan2(f.x, f.z);
       }
-      const wantFire = aiming ? input.mouseDown(0) : input.pressed('KeyF');
+      const firePressed = input.mouseJustPressed(0) || touchFire;
+      const fireHeld = input.mouseDown(0) || input.touchDown('fire');
+      const wantFire = input.pressed('KeyF') || (aiming && (firePressed || (this.weapons.def.automatic && fireHeld)));
       this.weapons.update(dt, wantFire, input.pressed('KeyR'));
       if (input.pressed('KeyQ')) this.weapons.cycleWeapon();
     }
-    if (input.pressed('KeyH')) {
+    if (driving && input.pressed('KeyH')) {
       // Horn: scatters the crowd.
       this.audio.play('horn');
       for (const ped of this.peds.peds) {
@@ -635,9 +673,6 @@ export class Game {
     }
 
     /* ── vehicles ── */
-    const allVehicles = this.allVehicles();
-    this.weaponTargets.length = 0;
-    this.weaponTargets.push(...allVehicles);
     this.traffic.playerVehicle = this.player.vehicle;
     this.traffic.prepareContext(
       this.player.position,
@@ -648,11 +683,12 @@ export class Game {
     );
     for (const car of allVehicles) {
       // The player's car is steered directly; the AI only drives the others.
-      if (car.driver !== 'player' && car.ai) car.ai.update(car, dt);
+      if (car.driver !== 'player' && !car.wrecked && car.ai) car.ai.update(car, dt);
       car.update(dt, world);
       if (car.wrecked && !car.destroyed) this.onVehicleWrecked(car);
     }
-    resolveVehiclePairs(allVehicles);
+    resolveVehiclePairs(allVehicles, this.onVehiclePairImpact);
+    if (this.player.vehicle) this.player.updateInVehicle(dt, this.player.vehicle);
     this.handleVehicleImpacts(allVehicles);
 
     /* ── traffic + police ── */
@@ -784,21 +820,23 @@ export class Game {
   private handleInteractions(): void {
     const input = this.input;
     let prompt = '';
+    const interact = input.pressed('KeyE') || input.touchJustPressed('action');
+    const action = this.touchMode ? '<kbd>USE</kbd>' : '<kbd>E</kbd>';
 
     if (this.player.vehicle) {
       const speed = Math.abs(this.player.vehicle.forwardSpeed);
       if (speed < 6) {
-        prompt = '<kbd>E</kbd> Get out';
+        prompt = `${action} Get out`;
       } else {
-        prompt = '<kbd>E</kbd> (slow down to exit)';
+        prompt = 'Slow down to exit';
       }
-      if (input.pressed('KeyE') && speed < 6) this.exitVehicle();
+      if (interact && speed < 6) this.exitVehicle();
     } else {
       const nearest = this.nearestVehicle(4.5);
       if (nearest) {
         const label = nearest.spec.label;
-        prompt = `<kbd>E</kbd> Enter ${label}`;
-        if (input.pressed('KeyE')) this.enterVehicle(nearest);
+        prompt = `${action} Enter ${label}`;
+        if (interact) this.enterVehicle(nearest);
       }
     }
 
@@ -813,7 +851,9 @@ export class Game {
     let bestDist = maxDist;
     for (const car of this.allVehicles()) {
       const d = dist2D(car.position.x, car.position.z, this.player.position.x, this.player.position.z);
-      if (d < bestDist) {
+      if (d < bestDist && !car.wrecked && !this.city.collision.raycast(
+        this.player.position.x, this.player.position.z, car.position.x, car.position.z,
+      ).hit) {
         bestDist = d;
         best = car;
       }
@@ -838,7 +878,10 @@ export class Game {
   private exitVehicle(): void {
     const car = this.player.vehicle;
     if (!car) return;
-    this.player.placeBeside(car, 1);
+    if (!this.player.placeBeside(car, this.city.collision)) {
+      this.hud.toast('No room to get out', 'bad');
+      return;
+    }
     this.player.vehicle = null;
     car.driver = 'none';
     car.setInput({ throttle: 0, steer: 0, handbrake: true });
@@ -897,11 +940,19 @@ export class Game {
     }
   }
 
+  private onVehiclePairImpact = (a: Vehicle, b: Vehicle, speed: number): void => {
+    if (speed <= 6) return;
+    if ((a.driver === 'player' && b.driver === 'police') ||
+        (b.driver === 'player' && a.driver === 'police')) {
+      this.wanted.add(0.3);
+    }
+  };
+
   private handleVehicleImpacts(vehicles: Vehicle[]): void {
     for (const car of vehicles) {
-      if (car.lastImpactSpeed > 6) {
-        const impact = car.lastImpactSpeed;
-        car.lastImpactSpeed = 0;
+      const impact = car.lastImpactSpeed;
+      car.lastImpactSpeed = 0;
+      if (impact > 6) {
         this.audio.play('crash');
         this.cameraRig.addShake(clamp01(impact / 40) * 0.8);
         this.effects.sparks(car.position.x, 0.8, car.position.z, 10);
@@ -910,7 +961,6 @@ export class Game {
           this.hud.damageFlash();
           this.cameraRig.addShake(0.22);
         }
-        if (this.traffic.police.includes(car)) this.wanted.add(0.3);
       }
     }
   }
@@ -951,6 +1001,7 @@ export class Game {
 
   private onVehicleWrecked(car: Vehicle): void {
     car.destroyed = true;
+    car.setInput({ throttle: 0, steer: 0, handbrake: true });
     this.effects.explosion(car.position.x, 0.4, car.position.z);
     this.audio.play('explosion');
     this.cameraRig.addShake(0.9);
@@ -958,7 +1009,10 @@ export class Game {
       // The player is thrown clear of the wreck.
       this.player.vehicle = null;
       car.driver = 'none';
-      this.player.placeBeside(car, 1);
+      if (!this.player.placeBeside(car, this.city.collision)) {
+        this.player.position.copy(car.position);
+        this.player.velocity.set(0, 0, 0);
+      }
       this.player.setVisible(true);
       this.player.damage(70);
       this.hud.damageFlash();
@@ -972,6 +1026,7 @@ export class Game {
     // Can the police see the player?
     let spotted = false;
     for (const cop of this.traffic.police) {
+      if (cop.wrecked || cop.driver !== 'police') continue;
       const d = dist2D(cop.position.x, cop.position.z, this.player.position.x, this.player.position.z);
       if (d > 85) continue;
       const hit = this.city.collision.raycast(cop.position.x, cop.position.z, this.player.position.x, this.player.position.z, 1.2);
@@ -986,7 +1041,7 @@ export class Game {
     // Dispatch the right number of units.
     const wantedCount = Math.min(5, this.wanted.level);
     if (this.traffic.police.length < wantedCount && this.wanted.dispatchDelay <= 0) {
-      this.traffic.spawnPolice(this.player.position.x, this.player.position.z);
+      this.traffic.spawnPolice(this.player.position.x, this.player.position.z, this.city.collision);
     }
     // Officers on foot: two from two stars, more as the heat climbs.
     const footCount = wantedCount >= 2 ? Math.min(4, wantedCount - 1) : 0;
@@ -1016,8 +1071,10 @@ export class Game {
         }
       }
       for (const cop of this.traffic.police) {
+        if (cop.wrecked || cop.driver !== 'police') continue;
         const d = dist2D(cop.position.x, cop.position.z, this.player.position.x, this.player.position.z);
-        if (d < 5.2 && Math.abs(cop.forwardSpeed) < 6) {
+        if (d < 5.2 && Math.abs(cop.forwardSpeed) < 6 &&
+            !this.city.collision.raycast(cop.position.x, cop.position.z, this.player.position.x, this.player.position.z).hit) {
           this.onPlayerDead('The cops got you');
           return;
         }
@@ -1037,6 +1094,7 @@ export class Game {
     this.player.dead = true;
     if (this.player.vehicle) {
       this.player.vehicle.setInput({ throttle: 0, steer: 0, handbrake: true });
+      this.player.vehicle.driver = 'none';
       this.player.vehicle = null;
     }
     this.audio.play('busted');
@@ -1523,9 +1581,7 @@ export class Game {
   simulate(seconds: number, step = 1 / 60): void {
     const steps = Math.floor(seconds / step);
     for (let i = 0; i < steps; i++) {
-      this.update(step);
-      // Mirror the real frame loop so one-shot inputs are consumed once.
-      this.input.endFrame();
+      this.step(step);
     }
   }
 

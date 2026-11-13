@@ -1019,8 +1019,10 @@ kbd {
   pointer-events: none;
 }
 
-.touch.on {
-  display: block;
+@media (pointer: coarse) {
+  .touch.on {
+    display: block;
+  }
 }
 
 .stick {

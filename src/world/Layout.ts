@@ -8,6 +8,7 @@
 
 export const ROAD_WIDTH = 16;
 export const LANE_OFFSET = 4.2;
+export const STOP_LINE_OFFSET = ROAD_WIDTH / 2 + 8.5;
 export const BLOCK_SIZE = 66;
 export const SIDEWALK_WIDTH = 4.5;
 export const CELL = BLOCK_SIZE + ROAD_WIDTH; // 82
@@ -176,23 +177,20 @@ export class RoadNetwork {
   }
 
   /** Pick the next edge to follow, preferring to continue straight. */
-  nextEdge(nodeId: number, currentEdge: number | null): number {
+  nextEdge(nodeId: number, currentEdge: number | null, random: () => number): number {
     const node = this.nodes[nodeId];
     const options = node.edges.filter((e) => e !== currentEdge);
     if (options.length === 0) return node.edges[0];
     const current = currentEdge === null ? null : this.edges[currentEdge];
-    const straight: number[] = [];
     if (current) {
-      const dir = this.edgeDirection(current.id, nodeId);
-      for (const e of options) {
-        const d = this.edgeDirection(e, nodeId);
-        if (Math.abs(d.dx - dir.dx) < 0.01 && Math.abs(d.dz - dir.dz) < 0.01) straight.push(e);
-      }
+      const inbound = this.edgeDirection(current.id, this.otherEnd(current.id, nodeId));
+      const straight = options.find((edge) => {
+        const dir = this.edgeDirection(edge, nodeId);
+        return dir.dx === inbound.dx && dir.dz === inbound.dz;
+      });
+      if (straight !== undefined && random() < 0.62) return straight;
     }
-    if (straight.length > 0 && Math.random() < 0.62) {
-      return straight[Math.floor(Math.random() * straight.length)];
-    }
-    return options[Math.floor(Math.random() * options.length)];
+    return options[Math.floor(random() * options.length)];
   }
 
   /**

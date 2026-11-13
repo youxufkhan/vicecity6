@@ -40,6 +40,8 @@ export class Wanted {
     this.heat = 0;
     this.spotted = false;
     this.sinceSeen = 0;
+    this.dispatchDelay = 0;
+    this.graceTimer = 0;
   }
 
   update(dt: number): void {

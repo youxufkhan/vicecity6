@@ -52,9 +52,9 @@ frame(now):
   acc     += dt
   while (acc >= STEP && steps < 5):                // STEP = 1/60
     update(STEP)
+    input.endStep()
     acc -= STEP
   render()
-  input.endFrame()                                 // clears one-shot input state
 ```
 
 Why it is built this way:
@@ -65,13 +65,12 @@ Why it is built this way:
 - **Step cap** — at most 5 steps per frame. If the renderer stalls (tab in the
   background, a slow GPU) the simulation slows down instead of spiralling or
   tunnelling cars through walls. `acc` is reset when the cap is hit.
-- **`endFrame()`** — one-shot input (`pressed`, `mousePressed`, `touchPressed`)
-  is cleared *after* the render, so a key press that arrives between frames is
-  consumed exactly once by the next update.
+- **`endStep()`** clears key edges, button edges, and accumulated look input
+  after a simulation step. Input survives renders with no simulation step and
+  is consumed once during catch-up frames.
 
-`Game.simulate(seconds)` runs the same `update()` in a loop and calls
-`input.endFrame()` after each step. It exists so the headless tests can drive
-the game deterministically without depending on wall-clock time.
+`Game.simulate(seconds)` uses the same step wrapper as the live loop so tests
+can drive the game deterministically without depending on wall-clock time.
 
 ## Game state machine
 
@@ -99,7 +98,7 @@ The order matters — it is the implicit contract between systems:
  3. player / vehicle       foot movement or vehicle throttle/steer
  4. aiming and shooting    aim point → weapon update → fire
  5. vehicles               AI drives the AI cars; every car integrates physics
- 6. traffic + police       spawn/recycle AI traffic; build the AI context
+ 6. traffic                spawn and recycle AI traffic
  7. pedestrians            walk, flee, despawn
  8. wanted                 heat decay, dispatch, busting
  9. missions               objective progress
@@ -110,11 +109,11 @@ The order matters — it is the implicit contract between systems:
 14. hud                    radar, speedometer, blips, markers
 ```
 
-Step 5 runs **before** step 6 so the AI context contains the vehicles from this
-frame; step 6 builds the context (`TrafficManager.prepareContext`) that step 5
-used. The context is rebuilt from the complete vehicle list every frame, so the
-AI always sees the player's car — including one the player parked and walked away
-from.
+Step 5 begins by rebuilding the AI context from the complete vehicle list,
+including a starter car that the player parked and walked away from. Each AI
+writes input once before its vehicle integrates. After pair collisions,
+the driver's position is synchronized to the car before the remaining systems
+read it.
 
 ## Ownership rules
 

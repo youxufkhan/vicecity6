@@ -130,7 +130,7 @@ wrong somewhere else.
 ## Known limitations
 
 - There is no interior geometry — every building is a solid volume.
-- The game is keyboard-and-mouse first; touch support exists but has not been tuned.
+- The game is keyboard-and-mouse first; touch supports movement, camera, driving, and firing.
 
 ### Resolved limitations
 - **Visible 3D weapon models & player overhaul** — real-time 3D models for sidearms and long guns (pistol with two-tone slide, micro SMG with shroud, shotgun) attached to the character's right hand; overhauled player character with tropical open-collar button-up shirt, aviator sunglasses, gold watch, and retro sneakers.
