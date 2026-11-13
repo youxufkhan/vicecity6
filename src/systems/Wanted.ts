@@ -50,9 +50,9 @@ export class Wanted {
     } else {
       this.sinceSeen += dt;
       // The police lose interest after a while out of sight.
-      if (this.sinceSeen > 9 && this.heat > 0) {
-        this.heat = Math.max(0, this.heat - dt * 0.32);
-        if (this.heat < 1) this.heat = 0;
+      if (this.sinceSeen > 4.5 && this.heat > 0) {
+        this.heat = Math.max(0, this.heat - dt * 0.45);
+        if (this.heat < 0.6) this.heat = 0;
       }
     }
   }

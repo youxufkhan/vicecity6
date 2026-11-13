@@ -41,41 +41,94 @@ export class FootCop {
     const hips = new THREE.Group();
     this.group.add(hips);
 
-    const torso = box(0.46, 0.62, 0.28, UNIFORM);
+    const torso = box(0.48, 0.62, 0.28, UNIFORM);
     torso.position.y = 1.15;
     hips.add(torso);
 
-    const vest = box(0.48, 0.26, 0.3, UNIFORM_DARK);
-    vest.position.y = 1.26;
+    const vest = box(0.50, 0.28, 0.31, UNIFORM_DARK);
+    vest.position.y = 1.25;
     hips.add(vest);
 
-    const badge = box(0.1, 0.1, 0.04, '#ffd45e');
-    badge.position.set(0.14, 1.3, -0.16);
+    // Reflective white POLICE markings
+    const patchFront = box(0.24, 0.06, 0.02, '#f8fafc');
+    patchFront.position.set(-0.08, 1.28, -0.16);
+    hips.add(patchFront);
+
+    const patchBack = box(0.32, 0.08, 0.02, '#f8fafc');
+    patchBack.position.set(0, 1.28, 0.16);
+    hips.add(patchBack);
+
+    // Gold police badge
+    const badge = box(0.09, 0.11, 0.04, '#ffd45e');
+    badge.position.set(0.14, 1.30, -0.165);
     hips.add(badge);
 
+    // Radio mic on shoulder
+    const radio = box(0.06, 0.08, 0.06, '#11141a');
+    radio.position.set(0.18, 1.44, -0.06);
+    hips.add(radio);
+
+    // Tactical duty belt & gear
+    const belt = box(0.51, 0.09, 0.31, '#0e1117');
+    belt.position.set(0, 0.88, 0);
+    hips.add(belt);
+
+    const holster = box(0.08, 0.14, 0.10, '#161a22');
+    holster.position.set(-0.25, 0.86, 0.02);
+    hips.add(holster);
+
+    const pouch = box(0.10, 0.10, 0.07, '#161a22');
+    pouch.position.set(0.25, 0.88, 0.02);
+    hips.add(pouch);
+
+    // Head
     const head = box(0.25, 0.26, 0.25, SKIN);
     head.position.y = 1.6;
     hips.add(head);
 
-    const cap = box(0.28, 0.1, 0.28, '#0d1526');
-    cap.position.y = 1.73;
+    // Aviator sunglasses
+    const glasses = box(0.24, 0.07, 0.05, '#0d1117');
+    glasses.position.set(0, 1.62, -0.13);
+    hips.add(glasses);
+
+    const glassBar = box(0.25, 0.015, 0.04, '#eab308');
+    glassBar.position.set(0, 1.65, -0.13);
+    hips.add(glassBar);
+
+    // Police Cap with peak and crest
+    const cap = box(0.29, 0.11, 0.29, '#0d1526');
+    cap.position.y = 1.74;
     hips.add(cap);
-    const brim = box(0.26, 0.04, 0.14, '#0d1526');
-    brim.position.set(0, 1.69, -0.18);
+
+    const capBadge = box(0.05, 0.06, 0.02, '#ffd45e');
+    capBadge.position.set(0, 1.75, -0.15);
+    hips.add(capBadge);
+
+    const brim = box(0.27, 0.04, 0.15, '#05070d');
+    brim.position.set(0, 1.70, -0.19);
+    brim.rotation.x = 0.08;
     hips.add(brim);
 
-    const legGeo = box(0.17, 0.84, 0.2, UNIFORM_DARK);
-    legGeo.position.y = -0.42;
+    // Legs with heavy service boots
+    const legGeo = box(0.17, 0.82, 0.20, UNIFORM_DARK);
+    legGeo.position.y = -0.41;
     this.legL.add(legGeo);
+    const bootL = box(0.18, 0.14, 0.28, '#090c12');
+    bootL.position.set(0, -0.82, 0.03);
+    this.legL.add(bootL);
     this.legL.position.set(0.11, 0.84, 0);
     hips.add(this.legL);
 
-    const legRGeo = box(0.17, 0.84, 0.2, UNIFORM_DARK);
-    legRGeo.position.y = -0.42;
+    const legRGeo = box(0.17, 0.82, 0.20, UNIFORM_DARK);
+    legRGeo.position.y = -0.41;
     this.legR.add(legRGeo);
+    const bootR = box(0.18, 0.14, 0.28, '#090c12');
+    bootR.position.set(0, -0.82, 0.03);
+    this.legR.add(bootR);
     this.legR.position.set(-0.11, 0.84, 0);
     hips.add(this.legR);
 
+    // Arms
     const armGeo = box(0.13, 0.52, 0.15, UNIFORM);
     armGeo.position.y = -0.26;
     this.armL.add(armGeo);
@@ -88,10 +141,14 @@ export class FootCop {
     this.armR.position.set(-0.31, 1.4, 0);
     hips.add(this.armR);
 
-    // Sidearm.
-    const gun = box(0.08, 0.1, 0.34, '#15181d');
-    gun.position.set(0, -0.5, -0.22);
+    // Sidearm service pistol with slide and barrel
+    const gun = box(0.065, 0.09, 0.28, '#12151b');
+    gun.position.set(0, -0.52, -0.18);
     this.armR.add(gun);
+
+    const gunBarrel = box(0.045, 0.045, 0.06, '#080a0f');
+    gunBarrel.position.set(0, -0.50, -0.32);
+    this.armR.add(gunBarrel);
   }
 
   damage(amount: number): boolean {

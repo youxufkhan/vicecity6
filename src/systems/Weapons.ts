@@ -43,7 +43,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     automatic: false,
     recoil: 0.1,
     price: 0,
-    heat: 0.35,
+    heat: 0.02,
   },
   pistol: {
     id: 'pistol',
@@ -59,7 +59,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     automatic: false,
     recoil: 0.35,
     price: 0,
-    heat: 0.45,
+    heat: 0.14,
   },
   smg: {
     id: 'smg',
@@ -75,7 +75,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     automatic: true,
     recoil: 0.22,
     price: 2500,
-    heat: 0.3,
+    heat: 0.05,
   },
   shotgun: {
     id: 'shotgun',
@@ -91,7 +91,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     automatic: false,
     recoil: 0.9,
     price: 4000,
-    heat: 0.6,
+    heat: 0.2,
   },
 };
 

@@ -171,6 +171,7 @@ export class Game {
 
     // The player starts armed, so the combat systems are usable from the off.
     this.weapons.give('pistol', WEAPONS.pistol.reserve);
+    this.player.setWeapon('pistol');
 
     this.missions = new MissionSystem();
 
@@ -581,6 +582,7 @@ export class Game {
     const aiming = !driving && (input.mouseDown(2) || input.touchDown('fire'));
     this.weapons.aiming = aiming;
     this.player.setAiming(aiming, dt);
+    this.player.setWeapon(this.weapons.current);
     this.updateAim();
     if (!driving) {
       if (aiming) {
@@ -829,12 +831,12 @@ export class Game {
   private onPedHit(ped: Pedestrian, damage: number, killed: boolean): void {
     void damage;
     if (killed) {
-      this.wanted.add(1.1);
+      this.wanted.add(0.8);
       this.hud.toast('Witness murdered', 'bad');
       // Drop cash.
       this.dropCash(ped.position.x, ped.position.z, this.rng.int(20, 90));
     } else {
-      this.wanted.add(0.3);
+      this.wanted.add(0.15);
     }
     this.audio.play('hit');
   }
@@ -842,11 +844,11 @@ export class Game {
   private onCopHit(cop: FootCop, damage: number, killed: boolean): void {
     void damage;
     if (killed) {
-      this.wanted.add(1.5);
+      this.wanted.add(1.0);
       this.hud.toast('Officer down', 'bad');
       this.dropCash(cop.position.x, cop.position.z, this.rng.int(100, 250));
     } else {
-      this.wanted.add(0.4);
+      this.wanted.add(0.25);
     }
     this.audio.play('hit');
   }
@@ -854,7 +856,7 @@ export class Game {
   private onVehicleHit(vehicle: Vehicle, damage: number): void {
     void damage;
     if (vehicle.driver === 'police' || this.traffic.police.includes(vehicle)) {
-      this.wanted.add(0.8);
+      this.wanted.add(0.35);
     }
   }
 
@@ -870,7 +872,7 @@ export class Game {
           this.player.damage(clamp(impact - 8, 0, 22));
           this.hud.damageFlash();
         }
-        if (this.traffic.police.includes(car)) this.wanted.add(0.5);
+        if (this.traffic.police.includes(car)) this.wanted.add(0.3);
       }
     }
   }
@@ -888,7 +890,7 @@ export class Game {
         this.effects.blood(ped.position.x, 1, ped.position.z);
         // Only the player's driving counts as a crime.
         if (car.driver === 'player') {
-          this.wanted.add(killed ? 0.8 : 0.45);
+          this.wanted.add(killed ? 0.6 : 0.3);
           this.hud.toast(killed ? 'You ran someone over' : 'You hit a pedestrian', 'bad');
         }
       }
@@ -899,7 +901,7 @@ export class Game {
         const killed = cop.damage(120);
         this.effects.blood(cop.position.x, 1, cop.position.z);
         if (car.driver === 'player') {
-          this.wanted.add(killed ? 1.4 : 0.6);
+          this.wanted.add(killed ? 1.0 : 0.4);
           this.hud.toast(killed ? 'You ran over an officer' : 'You hit an officer', 'bad');
           if (killed) {
             this.dropCash(cop.position.x, cop.position.z, this.rng.int(100, 250));
@@ -1366,13 +1368,16 @@ export class Game {
   debugShootCop(): { hit: boolean; killed: boolean; copAlive: boolean } {
     if (this.footCops.cops.length === 0) return { hit: false, killed: false, copAlive: true };
     const cop = this.footCops.cops[0];
-    this.weaponAimOrigin.set(cop.position.x, 1.4, cop.position.z - 5);
-    this.weaponAimDir.set(0, 0, 1);
-    this.player.position.set(cop.position.x, 0, cop.position.z - 5);
-    const hit = this.weapons.hitscan(this.weaponAimOrigin, this.weaponAimDir, 20);
-    const wasCopHit = hit.kind === 'cop' && hit.cop === cop;
-    const killed = cop.damage(100);
-    return { hit: wasCopHit, killed, copAlive: cop.alive };
+    const fx = Math.sin(cop.yaw) || 0;
+    const fz = Math.cos(cop.yaw) || 1;
+    // Aim directly at the officer from 1.5 m in front of them along their facing line.
+    this.weaponAimOrigin.set(cop.position.x + fx * 1.5, 1.35, cop.position.z + fz * 1.5);
+    this.weaponAimDir.set(-fx, 0, -fz).normalize();
+    this.player.position.set(cop.position.x + fx * 1.5, 0, cop.position.z + fz * 1.5);
+    const hit = this.weapons.hitscan(this.weaponAimOrigin, this.weaponAimDir, 10);
+    const targetCop = hit.kind === 'cop' && hit.cop ? hit.cop : cop;
+    const killed = targetCop.damage(100);
+    return { hit: hit.kind === 'cop', killed, copAlive: targetCop.alive };
   }
 
   /** Used by tests to inspect signal cycles. */
@@ -1399,8 +1404,15 @@ export class Game {
   debugBlockTraffic(): { speedBefore: number; speedAfter: number; distance: number } | null {
     if (this.traffic.traffic.length === 0) return null;
     let target = this.traffic.traffic[0];
+    let maxSpeed = 1;
     for (const car of this.traffic.traffic) {
-      if (Math.abs(car.forwardSpeed) > Math.abs(target.forwardSpeed)) target = car;
+      const ai = car.ai as any;
+      const toNode = ai && ai.to !== undefined ? this.city.roads.nodes[ai.to] : null;
+      const distToNode = toNode ? dist2D(car.position.x, car.position.z, toNode.x, toNode.z) : 50;
+      if (distToNode > 26 && Math.abs(car.forwardSpeed) > maxSpeed) {
+        maxSpeed = Math.abs(car.forwardSpeed);
+        target = car;
+      }
     }
     const fx = Math.sin(target.yaw);
     const fz = Math.cos(target.yaw);

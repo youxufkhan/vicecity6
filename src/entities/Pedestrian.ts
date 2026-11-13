@@ -5,9 +5,24 @@ import { dist2D, rngFrom, type Rng } from '../core/MathUtil';
 
 type PedState = 'walk' | 'flee' | 'stunned' | 'dead';
 
-const SKIN_TONES = ['#f0c9a3', '#d9a273', '#b57a4d', '#8a5a34', '#5f3b21'];
-const SHIRT_TONES = ['#e2e6ea', '#2b6fb5', '#d94f6d', '#f0a63c', '#48a97a', '#8f5fd0', '#1f2430'];
-const PANTS_TONES = ['#2b3b62', '#333a44', '#4a4034', '#1e2a22'];
+const SKIN_TONES = ['#f5d3b3', '#e8be96', '#d69e72', '#b37549', '#82502c', '#543018'];
+const SHIRT_TONES = [
+  '#ffffff',
+  '#ff6b8b',
+  '#20b2aa',
+  '#3867d6',
+  '#f39c12',
+  '#2ecc71',
+  '#9b59b6',
+  '#f1c40f',
+  '#1e272e',
+  '#e84118',
+  '#00cec9',
+  '#fd79a8',
+];
+const PANTS_TONES = ['#273c75', '#353b48', '#718093', '#b8a88a', '#2d3436', '#f5f6fa', '#4b5563'];
+const HAIR_TONES = ['#1a1716', '#3b2314', '#59381e', '#8a5024', '#d4af37', '#bca06c', '#71717a'];
+const SHOE_TONES = ['#1e272e', '#e84118', '#3867d6', '#ffffff', '#2c3e50', '#8c7ae6'];
 
 interface PedRig {
   group: THREE.Group;
@@ -200,10 +215,12 @@ export class Pedestrian {
 
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     const tint = this.hitFlash > 0 ? 1 : 0;
-    this.rig.torso.children.forEach((child) => {
-      const mesh = child as THREE.Mesh;
-      const mat = mesh.material as THREE.MeshStandardMaterial;
-      if (mat && mat.color) mat.emissive.setRGB(tint * 0.9, tint * 0.05, tint * 0.05);
+    this.rig.torso.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh) {
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        if (mat && mat.emissive) mat.emissive.setRGB(tint * 0.9, tint * 0.05, tint * 0.05);
+      }
     });
 
     this.group.position.set(this.position.x, 0, this.position.z);
@@ -243,6 +260,10 @@ function buildRig(rng: Rng): PedRig {
   const skin = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(SKIN_TONES)), roughness: 0.85 });
   const shirt = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(SHIRT_TONES)), roughness: 0.85 });
   const pants = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(PANTS_TONES)), roughness: 0.88 });
+  const shoeUpperMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(SHOE_TONES)), roughness: 0.75 });
+  const shoeSoleMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#f0f2f5'), roughness: 0.85 });
+  const beltMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#221c17'), roughness: 0.80 });
+  const buckleMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#d4af37'), metalness: 0.75, roughness: 0.35 });
 
   const box = (w: number, h: number, d: number, mat: THREE.Material): THREE.Mesh => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -250,44 +271,122 @@ function buildRig(rng: Rng): PedRig {
     return mesh;
   };
 
-  const body = box(0.4, 0.5, 0.24, shirt);
+  // ── Torso ──
+  const body = box(0.38, 0.46, 0.22, shirt);
   body.position.y = 0.25;
   torso.add(body);
-  const head = box(0.23, 0.25, 0.23, skin);
+
+  // V-neck skin opening
+  const vneck = box(0.12, 0.12, 0.04, skin);
+  vneck.position.set(0, 0.42, 0.10);
+  torso.add(vneck);
+
+  // Belt & buckle
+  const belt = box(0.39, 0.05, 0.23, beltMat);
+  belt.position.set(0, 0.04, 0);
+  torso.add(belt);
+  const buckle = box(0.08, 0.05, 0.02, buckleMat);
+  buckle.position.set(0, 0.04, 0.12);
+  torso.add(buckle);
+
+  // ── Head & Face ──
+  const head = box(0.22, 0.24, 0.22, skin);
   head.position.y = 0.62;
   torso.add(head);
-  const hair = box(0.25, 0.09, 0.25, new THREE.MeshStandardMaterial({ color: new THREE.Color('#241c18'), roughness: 0.9 }));
-  hair.position.y = 0.73;
-  torso.add(hair);
+
+  // Nose bridge
+  const nose = box(0.04, 0.06, 0.04, skin);
+  nose.position.set(0, 0.61, 0.12);
+  torso.add(nose);
+
+  // Hair style variety
+  const hairTone = rng.pick(HAIR_TONES);
+  const hairMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(hairTone), roughness: 0.9 });
+  const hairStyle = rng.int(0, 3);
+
+  if (hairStyle === 0) {
+    // Short crop with sideburns
+    const hairTop = box(0.24, 0.08, 0.24, hairMat);
+    hairTop.position.set(0, 0.74, 0);
+    const sideburnL = box(0.03, 0.10, 0.10, hairMat);
+    sideburnL.position.set(0.11, 0.63, 0.02);
+    const sideburnR = box(0.03, 0.10, 0.10, hairMat);
+    sideburnR.position.set(-0.11, 0.63, 0.02);
+    torso.add(hairTop, sideburnL, sideburnR);
+  } else if (hairStyle === 1) {
+    // 80s volume pompadour
+    const hairPomp = box(0.24, 0.14, 0.25, hairMat);
+    hairPomp.position.set(0, 0.77, -0.01);
+    torso.add(hairPomp);
+  } else if (hairStyle === 2) {
+    // Afro / round curls
+    const afro = box(0.28, 0.16, 0.28, hairMat);
+    afro.position.set(0, 0.75, 0);
+    torso.add(afro);
+  } else {
+    // Baseball cap / sun visor
+    const capColor = rng.pick(['#e74c3c', '#3498db', '#2ecc71', '#1e272e', '#f39c12']);
+    const capMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(capColor), roughness: 0.85 });
+    const capCrown = box(0.24, 0.08, 0.24, capMat);
+    capCrown.position.set(0, 0.73, 0);
+    const capBrim = box(0.20, 0.02, 0.12, capMat);
+    capBrim.position.set(0, 0.70, 0.15);
+    torso.add(capCrown, capBrim);
+  }
+
+  // Sunglasses (45% probability)
+  if (rng.chance(0.45)) {
+    const glassesGlass = new THREE.MeshStandardMaterial({ color: 0x0c0e12, roughness: 0.1, metalness: 0.85 });
+    const glassesFrame = new THREE.MeshStandardMaterial({ color: rng.chance(0.5) ? 0xd4af37 : 0x22262c, metalness: 0.7, roughness: 0.3 });
+    const lenses = box(0.18, 0.05, 0.03, glassesGlass);
+    lenses.position.set(0, 0.64, 0.12);
+    const bridge = box(0.04, 0.02, 0.02, glassesFrame);
+    bridge.position.set(0, 0.65, 0.12);
+    torso.add(lenses, bridge);
+  }
 
   torso.position.y = 0.96;
   hips.add(torso);
 
+  // ── Arms (properly matching short sleeves + skin forearms/hands) ──
   const armL = new THREE.Group();
-  const armLGeo = box(0.11, 0.48, 0.13, shirt);
-  armLGeo.position.y = -0.24;
-  armL.add(armLGeo);
-  armL.position.set(0.26, 0.46, 0);
+  const sleeveL = box(0.11, 0.24, 0.12, shirt);
+  sleeveL.position.y = -0.12;
+  const handL = box(0.09, 0.24, 0.11, skin);
+  handL.position.y = -0.36;
+  armL.add(sleeveL, handL);
+  armL.position.set(0.25, 0.46, 0);
   torso.add(armL);
 
   const armR = new THREE.Group();
-  const armRGeo = box(0.11, 0.48, 0.13, skin);
-  armRGeo.position.y = -0.24;
-  armR.add(armRGeo);
-  armR.position.set(-0.26, 0.46, 0);
+  const sleeveR = box(0.11, 0.24, 0.12, shirt);
+  sleeveR.position.y = -0.12;
+  const handR = box(0.09, 0.24, 0.11, skin);
+  handR.position.y = -0.36;
+  armR.add(sleeveR, handR);
+  armR.position.set(-0.25, 0.46, 0);
   torso.add(armR);
 
+  // ── Legs with detailed pants + retro sneakers ──
   const legL = new THREE.Group();
-  const legLGeo = box(0.15, 0.82, 0.18, pants);
-  legLGeo.position.y = -0.41;
-  legL.add(legLGeo);
+  const pantsL = box(0.14, 0.66, 0.16, pants);
+  pantsL.position.y = -0.33;
+  const shoeL = box(0.15, 0.10, 0.22, shoeUpperMat);
+  shoeL.position.set(0, -0.71, 0.02);
+  const soleL = box(0.15, 0.04, 0.23, shoeSoleMat);
+  soleL.position.set(0, -0.77, 0.02);
+  legL.add(pantsL, shoeL, soleL);
   legL.position.set(0.1, 0.84, 0);
   hips.add(legL);
 
   const legR = new THREE.Group();
-  const legRGeo = box(0.15, 0.82, 0.18, pants);
-  legRGeo.position.y = -0.41;
-  legR.add(legRGeo);
+  const pantsR = box(0.14, 0.66, 0.16, pants);
+  pantsR.position.y = -0.33;
+  const shoeR = box(0.15, 0.10, 0.22, shoeUpperMat);
+  shoeR.position.set(0, -0.71, 0.02);
+  const soleR = box(0.15, 0.04, 0.23, shoeSoleMat);
+  soleR.position.set(0, -0.77, 0.02);
+  legR.add(pantsR, shoeR, soleR);
   legR.position.set(-0.1, 0.84, 0);
   hips.add(legR);
 
@@ -385,16 +484,16 @@ export class PedManager {
         continue;
       }
 
-      // Flee from gunfire, from the player, and from approaching traffic vehicles.
+      // Flee from gunfire, from the player, and from dangerously approaching vehicles.
       if (ped.state !== 'dead' && ped.state !== 'stunned') {
         if (dist < 14) {
           ped.fleeFrom(playerX, playerZ);
         } else if (vehicles) {
           for (let v = 0; v < vehicles.length; v++) {
             const car = vehicles[v];
-            if (Math.abs(car.forwardSpeed) < 3.5) continue;
+            if (Math.abs(car.forwardSpeed) < 4.0) continue;
             const carDist = dist2D(ped.position.x, ped.position.z, car.position.x, car.position.z);
-            if (carDist < 8.5) {
+            if (carDist < 3.8) {
               ped.fleeFrom(car.position.x, car.position.z);
               break;
             }

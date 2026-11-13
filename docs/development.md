@@ -133,7 +133,11 @@ wrong somewhere else.
 - The game is keyboard-and-mouse first; touch support exists but has not been tuned.
 
 ### Resolved limitations
-- **Pedestrian traffic awareness** — pedestrians detect approaching vehicles (>3.5 m/s within 8.5 m) and flee to avoid being run over.
+- **Visible 3D weapon models & player overhaul** — real-time 3D models for sidearms and long guns (pistol with two-tone slide, micro SMG with shroud, shotgun) attached to the character's right hand; overhauled player character with tropical open-collar button-up shirt, aviator sunglasses, gold watch, and retro sneakers.
+- **Next-gen procedural 3D automotive models** — overhauled vehicle visuals with aerodynamic front grilles, chin splitters, rear diffusers, dual chrome exhaust tips, side view mirrors, flared wheel arches, raked glass greenhouses, and 5-spoke alloy wheels with metallic brake disc rotors and red calipers.
+- **Police and pedestrian visual upgrades** — foot police officers equipped with tactical dark-navy body armor vests, reflective POLICE lettering, gold badges, shoulder radios, utility duty belts, peaked service caps, and combat boots; civilians feature varied 80s hairstyles, diverse skin tones, sunglasses, and retro sneakers.
+- **Wanted system rebalance** — tuned weapon shot and public disturbance heat, reduced sightless cooldown wait from 9.0s to 4.5s, and increased heat dissipation rate to 0.45/s for responsive, thrilling police evasion gameplay.
+- **Pedestrian traffic awareness** — pedestrians detect approaching vehicles (>4.0 m/s within 3.8 m) and flee to avoid being run over.
 - **Foot police combat & hitboxes** — officers on foot have full cylinder hitboxes, take bullet damage, can be eliminated or run over, and drop cash bounties when eliminated.
 - **Dynamic traffic light cycles** — signal durations dynamically scale from 17 s in the dense downtown core to 11 s along outer districts.
 - **Resilient audio resume** — AudioContext automatically initializes or resumes across keydown, pointerdown, and touchstart gestures, preventing silent audio context lockouts.

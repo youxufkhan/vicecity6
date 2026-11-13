@@ -17,6 +17,85 @@ function limb(w: number, h: number, d: number, color: string): THREE.Mesh {
   return mesh;
 }
 
+function buildPistol(): THREE.Group {
+  const g = new THREE.Group();
+  // Slide & barrel (two-tone steel)
+  const slide = limb(0.065, 0.08, 0.28, '#1f242d');
+  slide.position.set(0, 0.04, -0.09);
+  g.add(slide);
+  // Barrel bore
+  const barrel = limb(0.045, 0.045, 0.06, '#0f1115');
+  barrel.position.set(0, 0.04, -0.24);
+  g.add(barrel);
+  // Textured grip
+  const grip = limb(0.055, 0.16, 0.09, '#4a3325');
+  grip.position.set(0, -0.06, 0.01);
+  grip.rotation.x = 0.22;
+  g.add(grip);
+  // Trigger guard
+  const guard = limb(0.035, 0.06, 0.08, '#1f242d');
+  guard.position.set(0, -0.02, -0.05);
+  g.add(guard);
+  // Sights
+  const frontSight = limb(0.02, 0.025, 0.03, '#ffffff');
+  frontSight.position.set(0, 0.085, -0.20);
+  g.add(frontSight);
+  return g;
+}
+
+function buildSmg(): THREE.Group {
+  const g = new THREE.Group();
+  // Receiver
+  const receiver = limb(0.08, 0.11, 0.36, '#181b22');
+  receiver.position.set(0, 0.04, -0.08);
+  g.add(receiver);
+  // Barrel & shroud
+  const barrel = limb(0.05, 0.05, 0.14, '#0f1216');
+  barrel.position.set(0, 0.04, -0.28);
+  g.add(barrel);
+  // Extended magazine
+  const mag = limb(0.045, 0.22, 0.065, '#262a33');
+  mag.position.set(0, -0.10, 0.02);
+  mag.rotation.x = 0.15;
+  g.add(mag);
+  // Grip
+  const grip = limb(0.06, 0.15, 0.09, '#181b22');
+  grip.position.set(0, -0.06, 0.01);
+  grip.rotation.x = 0.22;
+  g.add(grip);
+  // Stock
+  const stock = limb(0.07, 0.08, 0.16, '#333a44');
+  stock.position.set(0, 0.03, 0.16);
+  g.add(stock);
+  return g;
+}
+
+function buildShotgun(): THREE.Group {
+  const g = new THREE.Group();
+  // Long blued steel barrel
+  const barrel = limb(0.06, 0.06, 0.65, '#1e232a');
+  barrel.position.set(0, 0.05, -0.24);
+  g.add(barrel);
+  // Under-barrel magazine tube
+  const magTube = limb(0.055, 0.055, 0.52, '#252b34');
+  magTube.position.set(0, 0.0, -0.18);
+  g.add(magTube);
+  // Pump slide
+  const pump = limb(0.075, 0.08, 0.18, '#5c3924');
+  pump.position.set(0, 0.01, -0.26);
+  g.add(pump);
+  // Receiver
+  const receiver = limb(0.075, 0.11, 0.22, '#181b22');
+  receiver.position.set(0, 0.03, 0.1);
+  g.add(receiver);
+  // Stock
+  const stock = limb(0.065, 0.13, 0.32, '#5c3924');
+  stock.position.set(0, -0.04, 0.34);
+  stock.rotation.x = -0.12;
+  g.add(stock);
+  return g;
+}
+
 /** Third-person player character with a hand-animated walk cycle. */
 export class Player {
   readonly group = new THREE.Group();
@@ -44,53 +123,165 @@ export class Player {
   private aimBlend = 0;
   private onGround = true;
 
+  private pistolMesh: THREE.Group;
+  private smgMesh: THREE.Group;
+  private shotgunMesh: THREE.Group;
+
   constructor() {
-    const body = limb(0.46, 0.56, 0.27, SHIRT);
-    body.position.y = 0.28;
+    // Torso: tropical button-up shirt with open collar & undershirt
+    const body = limb(0.48, 0.54, 0.28, SHIRT);
+    body.position.y = 0.29;
     this.torso.add(body);
+
+    // V-neck open collar flaps
+    const collarL = limb(0.08, 0.22, 0.03, '#179686');
+    collarL.position.set(0.11, 0.44, -0.145);
+    collarL.rotation.z = 0.18;
+    this.torso.add(collarL);
+
+    const collarR = limb(0.08, 0.22, 0.03, '#179686');
+    collarR.position.set(-0.11, 0.44, -0.145);
+    collarR.rotation.z = -0.18;
+    this.torso.add(collarR);
+
+    // White undershirt & chest inset
+    const undershirt = limb(0.14, 0.18, 0.02, '#f1f5f9');
+    undershirt.position.set(0, 0.42, -0.14);
+    this.torso.add(undershirt);
+
+    const chestSkin = limb(0.10, 0.13, 0.02, SKIN);
+    chestSkin.position.set(0, 0.47, -0.142);
+    this.torso.add(chestSkin);
+
+    // Leather belt with gold buckle
+    const belt = limb(0.49, 0.08, 0.29, '#3a271c');
+    belt.position.set(0, 0.04, 0);
+    this.torso.add(belt);
+
+    const buckle = limb(0.11, 0.09, 0.04, '#d4af37');
+    buckle.position.set(0, 0.04, -0.15);
+    this.torso.add(buckle);
+
     this.torso.position.y = 1.0;
     this.hips.add(this.torso);
 
-    const head = limb(0.26, 0.28, 0.26, SKIN);
+    // Head
+    const head = limb(0.25, 0.27, 0.25, SKIN);
     head.position.y = 0.7;
     this.torso.add(head);
-    const hair = limb(0.29, 0.11, 0.29, '#241c18');
-    hair.position.y = 0.83;
+
+    // Aviator sunglasses
+    const shades = limb(0.24, 0.08, 0.05, '#0e121a');
+    shades.position.set(0, 0.72, -0.13);
+    this.torso.add(shades);
+
+    const browBar = limb(0.25, 0.02, 0.04, '#eab308');
+    browBar.position.set(0, 0.76, -0.13);
+    this.torso.add(browBar);
+
+    // Layered 80s hairstyle
+    const hair = limb(0.28, 0.12, 0.28, '#241c18');
+    hair.position.set(0, 0.84, -0.01);
     this.torso.add(hair);
 
-    const armGeo = limb(0.13, 0.54, 0.15, SKIN);
-    armGeo.position.y = -0.27;
-    this.armL.add(armGeo);
+    const sideburnL = limb(0.04, 0.16, 0.14, '#241c18');
+    sideburnL.position.set(0.135, 0.73, 0.02);
+    this.torso.add(sideburnL);
+
+    const sideburnR = limb(0.04, 0.16, 0.14, '#241c18');
+    sideburnR.position.set(-0.135, 0.73, 0.02);
+    this.torso.add(sideburnR);
+
+    // Arms
+    // Left arm: sleeve + forearm + wristwatch + hand
+    const sleeveL = limb(0.14, 0.18, 0.16, SHIRT);
+    sleeveL.position.y = -0.09;
+    this.armL.add(sleeveL);
+
+    const armLGeo = limb(0.12, 0.34, 0.13, SKIN);
+    armLGeo.position.y = -0.32;
+    this.armL.add(armLGeo);
+
+    const watch = limb(0.135, 0.045, 0.145, '#d4af37');
+    watch.position.set(0, -0.45, 0);
+    this.armL.add(watch);
+
+    const handL = limb(0.10, 0.10, 0.12, SKIN);
+    handL.position.set(0, -0.52, 0);
+    this.armL.add(handL);
+
     this.armL.position.set(0.32, 0.5, 0);
     this.torso.add(this.armL);
 
-    const armRGeo = limb(0.13, 0.54, 0.15, SKIN);
-    armRGeo.position.y = -0.27;
+    // Right arm: sleeve + forearm + hand + visible weapon mount
+    const sleeveR = limb(0.14, 0.18, 0.16, SHIRT);
+    sleeveR.position.y = -0.09;
+    this.armR.add(sleeveR);
+
+    const armRGeo = limb(0.12, 0.34, 0.13, SKIN);
+    armRGeo.position.y = -0.32;
     this.armR.add(armRGeo);
+
+    const handR = limb(0.10, 0.10, 0.12, SKIN);
+    handR.position.set(0, -0.52, 0);
+    this.armR.add(handR);
+
+    // Weapons attached to right hand
+    this.pistolMesh = buildPistol();
+    this.pistolMesh.position.set(0, -0.52, -0.08);
+    this.armR.add(this.pistolMesh);
+
+    this.smgMesh = buildSmg();
+    this.smgMesh.position.set(0, -0.52, -0.08);
+    this.smgMesh.visible = false;
+    this.armR.add(this.smgMesh);
+
+    this.shotgunMesh = buildShotgun();
+    this.shotgunMesh.position.set(0, -0.52, -0.08);
+    this.shotgunMesh.visible = false;
+    this.armR.add(this.shotgunMesh);
+
     this.armR.position.set(-0.32, 0.5, 0);
     this.torso.add(this.armR);
 
-    const legGeo = limb(0.17, 0.86, 0.2, JEANS);
-    legGeo.position.y = -0.43;
+    // Legs
+    const legGeo = limb(0.17, 0.84, 0.20, JEANS);
+    legGeo.position.y = -0.42;
     this.legL.add(legGeo);
     this.legL.position.set(0.11, 0.88, 0);
     this.hips.add(this.legL);
 
-    const legRGeo = limb(0.17, 0.86, 0.2, JEANS);
-    legRGeo.position.y = -0.43;
+    const legRGeo = limb(0.17, 0.84, 0.20, JEANS);
+    legRGeo.position.y = -0.42;
     this.legR.add(legRGeo);
     this.legR.position.set(-0.11, 0.88, 0);
     this.hips.add(this.legR);
 
-    const shoeGeo = limb(0.19, 0.12, 0.3, SHOES);
-    shoeGeo.position.set(0, -0.86, 0.04);
-    this.legL.add(shoeGeo);
-    const shoeGeo2 = limb(0.19, 0.12, 0.3, SHOES);
-    shoeGeo2.position.set(0, -0.86, 0.04);
-    this.legR.add(shoeGeo2);
+    // Retro sneakers with white outsoles
+    const soleL = limb(0.19, 0.05, 0.30, '#f8fafc');
+    soleL.position.set(0, -0.87, 0.04);
+    this.legL.add(soleL);
+
+    const shoeL = limb(0.18, 0.10, 0.28, SHOES);
+    shoeL.position.set(0, -0.80, 0.04);
+    this.legL.add(shoeL);
+
+    const soleR = limb(0.19, 0.05, 0.30, '#f8fafc');
+    soleR.position.set(0, -0.87, 0.04);
+    this.legR.add(soleR);
+
+    const shoeR = limb(0.18, 0.10, 0.28, SHOES);
+    shoeR.position.set(0, -0.80, 0.04);
+    this.legR.add(shoeR);
 
     this.group.add(this.hips);
     this.group.name = 'player';
+  }
+
+  setWeapon(weapon: string): void {
+    this.pistolMesh.visible = weapon === 'pistol';
+    this.smgMesh.visible = weapon === 'smg';
+    this.shotgunMesh.visible = weapon === 'shotgun';
   }
 
   get isDriving(): boolean {

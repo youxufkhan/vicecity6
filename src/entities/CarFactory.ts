@@ -165,38 +165,38 @@ export const CIVIL_PAINT: string[] = [
 
 export const bodyMaterial = new THREE.MeshStandardMaterial({
   vertexColors: true,
-  roughness: 0.34,
-  metalness: 0.55,
+  roughness: 0.26,
+  metalness: 0.65,
 });
 
 export const glassMaterial = new THREE.MeshStandardMaterial({
-  color: 0x10161f,
-  roughness: 0.12,
-  metalness: 0.85,
+  color: 0x0c1218,
+  roughness: 0.08,
+  metalness: 0.90,
   transparent: true,
-  opacity: 0.82,
+  opacity: 0.86,
 });
 
 export const headlightMaterial = new THREE.MeshStandardMaterial({
-  color: 0xfff4d0,
-  emissive: 0xfff0c4,
-  emissiveIntensity: 0.85,
-  roughness: 0.3,
+  color: 0xfffae8,
+  emissive: 0xfff4d0,
+  emissiveIntensity: 1.15,
+  roughness: 0.22,
   toneMapped: false,
 });
 
 export const tailMaterial = new THREE.MeshStandardMaterial({
-  color: 0xff2a35,
-  emissive: 0xff1122,
-  emissiveIntensity: 0.5,
-  roughness: 0.4,
+  color: 0xff1e28,
+  emissive: 0xff1020,
+  emissiveIntensity: 0.65,
+  roughness: 0.32,
   toneMapped: false,
 });
 
 export const wheelMaterial = new THREE.MeshStandardMaterial({
   vertexColors: true,
-  roughness: 0.85,
-  metalness: 0.15,
+  roughness: 0.52,
+  metalness: 0.38,
 });
 
 function boxGeo(w: number, h: number, d: number, x: number, y: number, z: number): THREE.BufferGeometry {
@@ -212,7 +212,17 @@ function mergeParts(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
 }
 
 /** Geometry shared by every car of a given spec (cloned per car). */
-const baseCache = new Map<string, { body: THREE.BufferGeometry; glass: THREE.BufferGeometry; head: THREE.BufferGeometry; tail: THREE.BufferGeometry; wheel: THREE.BufferGeometry }>();
+const baseCache = new Map<
+  string,
+  {
+    body: THREE.BufferGeometry;
+    trim: THREE.BufferGeometry;
+    glass: THREE.BufferGeometry;
+    head: THREE.BufferGeometry;
+    tail: THREE.BufferGeometry;
+    wheel: THREE.BufferGeometry;
+  }
+>();
 
 function baseFor(spec: CarSpec) {
   let cached = baseCache.get(spec.id);
@@ -220,57 +230,224 @@ function baseFor(spec: CarSpec) {
 
   const w = spec.width;
   const l = spec.length;
-  const bodyY = spec.bodyBottom + spec.bodyHeight / 2;
 
-  // Painted shell: lower body, hood, boot, cabin roof.
-  const shell = mergeParts([
-    boxGeo(w, spec.bodyHeight, l, 0, bodyY, 0),
-    boxGeo(w * 0.97, spec.bodyHeight * 0.5, l * 0.3, 0, spec.bodyBottom + spec.bodyHeight * 0.82, l * 0.31),
-    boxGeo(w * 0.97, spec.bodyHeight * 0.42, l * 0.24, 0, spec.bodyBottom + spec.bodyHeight * 0.76, -l * 0.35),
-    boxGeo(spec.cabinWidth, spec.cabinHeight * 0.34, spec.cabinLength, 0, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.33, spec.cabinZ),
-  ]);
+  // ── Painted Shell (panels receiving the primary paint color) ──
+  const shellParts: THREE.BufferGeometry[] = [
+    // Main lower chassis and rocker panels
+    boxGeo(w * 0.94, spec.bodyHeight * 0.58, l * 0.94, 0, spec.bodyBottom + spec.bodyHeight * 0.32, 0),
+    // Sloping front hood
+    boxGeo(w * 0.90, spec.bodyHeight * 0.36, l * 0.30, 0, spec.bodyBottom + spec.bodyHeight * 0.72, l * 0.31),
+    // Front nose fascia drop
+    boxGeo(w * 0.88, spec.bodyHeight * 0.26, l * 0.08, 0, spec.bodyBottom + spec.bodyHeight * 0.62, l * 0.46),
+    // Cabin roof panel
+    boxGeo(spec.cabinWidth * 0.88, 0.06, spec.cabinLength * 0.80, 0, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight, spec.cabinZ),
+    // Muscular flared wheel arches
+    boxGeo(0.06, spec.bodyHeight * 0.36, spec.wheelRadius * 2.2, w * 0.46, spec.bodyBottom + spec.bodyHeight * 0.42, spec.wheelBase / 2),
+    boxGeo(0.06, spec.bodyHeight * 0.36, spec.wheelRadius * 2.2, -w * 0.46, spec.bodyBottom + spec.bodyHeight * 0.42, spec.wheelBase / 2),
+    boxGeo(0.06, spec.bodyHeight * 0.36, spec.wheelRadius * 2.2, w * 0.46, spec.bodyBottom + spec.bodyHeight * 0.42, -spec.wheelBase / 2),
+    boxGeo(0.06, spec.bodyHeight * 0.36, spec.wheelRadius * 2.2, -w * 0.46, spec.bodyBottom + spec.bodyHeight * 0.42, -spec.wheelBase / 2),
+  ];
 
-  // Glass band.
-  const glass = mergeParts([
-    boxGeo(
-      spec.cabinWidth * 0.95,
-      spec.cabinHeight * 0.72,
-      spec.cabinLength * 0.94,
-      0,
-      spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.22,
-      spec.cabinZ,
-    ),
-  ]);
+  if (spec.id !== 'pickup') {
+    // Rear trunk decklid
+    shellParts.push(boxGeo(w * 0.90, spec.bodyHeight * 0.34, l * 0.24, 0, spec.bodyBottom + spec.bodyHeight * 0.70, -l * 0.35));
+  } else {
+    // Open truck bed walls, floor, and tailgate
+    shellParts.push(
+      boxGeo(0.12, spec.bodyHeight * 0.52, l * 0.40, w * 0.42, spec.bodyBottom + spec.bodyHeight * 0.72, -l * 0.25),
+      boxGeo(0.12, spec.bodyHeight * 0.52, l * 0.40, -w * 0.42, spec.bodyBottom + spec.bodyHeight * 0.72, -l * 0.25),
+      boxGeo(w * 0.86, spec.bodyHeight * 0.50, 0.08, 0, spec.bodyBottom + spec.bodyHeight * 0.72, -l * 0.45),
+      boxGeo(w * 0.80, 0.06, l * 0.38, 0, spec.bodyBottom + spec.bodyHeight * 0.48, -l * 0.25),
+    );
+  }
 
-  // Head lights.
+  if (spec.id === 'sports') {
+    // Aerodynamic rear wing spoiler and hood cooling vents
+    shellParts.push(
+      boxGeo(w * 0.88, 0.05, 0.30, 0, spec.bodyBottom + spec.bodyHeight + 0.38, -l * 0.44),
+      boxGeo(w * 0.42, 0.04, l * 0.16, 0, spec.bodyBottom + spec.bodyHeight * 0.92, l * 0.32),
+    );
+  } else if (spec.id === 'coupe') {
+    // Performance ducktail rear lip and hood power bulge
+    shellParts.push(
+      boxGeo(w * 0.82, 0.08, 0.14, 0, spec.bodyBottom + spec.bodyHeight * 0.88, -l * 0.46),
+      boxGeo(w * 0.35, 0.06, l * 0.22, 0, spec.bodyBottom + spec.bodyHeight * 0.92, l * 0.30),
+    );
+  } else if (spec.id === 'suv') {
+    // Rear tailgate roof spoiler lip
+    shellParts.push(
+      boxGeo(spec.cabinWidth * 0.88, 0.06, 0.18, 0, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.02, spec.cabinZ - spec.cabinLength / 2 - 0.06),
+    );
+  }
+
+  const shell = mergeParts(shellParts);
+
+  // ── Trim & Aero Accents (vertex-colored matte black, chrome, and graphite) ──
+  const trimParts: THREE.BufferGeometry[] = [];
+
+  // Front radiator grille (dark mesh)
+  const grille = boxGeo(w * 0.62, spec.bodyHeight * 0.30, 0.06, 0, spec.bodyBottom + spec.bodyHeight * 0.48, l / 2 + 0.01);
+  applyColor(grille, new THREE.Color('#121417'));
+  trimParts.push(grille);
+
+  // Front bumper bar & lower chin splitter
+  const fBumper = boxGeo(w * 0.94, spec.bodyHeight * 0.20, 0.16, 0, spec.bodyBottom + spec.bodyHeight * 0.24, l / 2 + 0.01);
+  applyColor(fBumper, new THREE.Color('#181a1e'));
+  const fSplitter = boxGeo(w * 0.95, 0.06, 0.24, 0, spec.bodyBottom + 0.04, l / 2 - 0.04);
+  applyColor(fSplitter, new THREE.Color('#181a1e'));
+  trimParts.push(fBumper, fSplitter);
+
+  // Rear bumper & aerodynamic diffuser
+  const rBumper = boxGeo(w * 0.94, spec.bodyHeight * 0.24, 0.16, 0, spec.bodyBottom + spec.bodyHeight * 0.24, -l / 2 - 0.01);
+  applyColor(rBumper, new THREE.Color('#181a1e'));
+  const rDiffuser = boxGeo(w * 0.65, 0.06, 0.22, 0, spec.bodyBottom + 0.04, -l / 2 + 0.02);
+  applyColor(rDiffuser, new THREE.Color('#181a1e'));
+  trimParts.push(rBumper, rDiffuser);
+
+  // Dual chrome exhaust pipes & hollow tips
+  const exhaustL = boxGeo(0.12, 0.08, 0.22, w * 0.28, spec.bodyBottom + 0.12, -l / 2 - 0.04);
+  applyColor(exhaustL, new THREE.Color('#d8dee9'));
+  const exhaustLIn = boxGeo(0.08, 0.05, 0.05, w * 0.28, spec.bodyBottom + 0.12, -l / 2 - 0.13);
+  applyColor(exhaustLIn, new THREE.Color('#0d0e10'));
+  const exhaustR = boxGeo(0.12, 0.08, 0.22, -w * 0.28, spec.bodyBottom + 0.12, -l / 2 - 0.04);
+  applyColor(exhaustR, new THREE.Color('#d8dee9'));
+  const exhaustRIn = boxGeo(0.08, 0.05, 0.05, -w * 0.28, spec.bodyBottom + 0.12, -l / 2 - 0.13);
+  applyColor(exhaustRIn, new THREE.Color('#0d0e10'));
+  trimParts.push(exhaustL, exhaustLIn, exhaustR, exhaustRIn);
+
+  // Aerodynamic side view mirrors
+  const mirrorL = boxGeo(0.16, 0.10, 0.12, w / 2 + 0.08, spec.bodyBottom + spec.bodyHeight + 0.06, spec.cabinZ + spec.cabinLength * 0.36);
+  applyColor(mirrorL, new THREE.Color('#181b20'));
+  const glassL = boxGeo(0.12, 0.07, 0.02, w / 2 + 0.08, spec.bodyBottom + spec.bodyHeight + 0.06, spec.cabinZ + spec.cabinLength * 0.36 - 0.06);
+  applyColor(glassL, new THREE.Color('#a0aab8'));
+
+  const mirrorR = boxGeo(0.16, 0.10, 0.12, -w / 2 - 0.08, spec.bodyBottom + spec.bodyHeight + 0.06, spec.cabinZ + spec.cabinLength * 0.36);
+  applyColor(mirrorR, new THREE.Color('#181b20'));
+  const glassR = boxGeo(0.12, 0.07, 0.02, -w / 2 - 0.08, spec.bodyBottom + spec.bodyHeight + 0.06, spec.cabinZ + spec.cabinLength * 0.36 - 0.06);
+  applyColor(glassR, new THREE.Color('#a0aab8'));
+  trimParts.push(mirrorL, glassL, mirrorR, glassR);
+
+  // Black B-pillars and window frames
+  const bPillarL = boxGeo(0.04, spec.cabinHeight * 0.60, 0.10, spec.cabinWidth * 0.46, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.36, spec.cabinZ);
+  applyColor(bPillarL, new THREE.Color('#16181c'));
+  const bPillarR = boxGeo(0.04, spec.cabinHeight * 0.60, 0.10, -spec.cabinWidth * 0.46, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.36, spec.cabinZ);
+  applyColor(bPillarR, new THREE.Color('#16181c'));
+  trimParts.push(bPillarL, bPillarR);
+
+  if (spec.id === 'sports') {
+    const stanchionL = boxGeo(0.05, 0.24, 0.10, w * 0.25, spec.bodyBottom + spec.bodyHeight + 0.24, -l * 0.44);
+    applyColor(stanchionL, new THREE.Color('#141619'));
+    const stanchionR = boxGeo(0.05, 0.24, 0.10, -w * 0.25, spec.bodyBottom + spec.bodyHeight + 0.24, -l * 0.44);
+    applyColor(stanchionR, new THREE.Color('#141619'));
+    const wingletL = boxGeo(0.05, 0.12, 0.24, w * 0.48, spec.bodyBottom + 0.08, l / 2 - 0.06);
+    applyColor(wingletL, new THREE.Color('#141619'));
+    const wingletR = boxGeo(0.05, 0.12, 0.24, -w * 0.48, spec.bodyBottom + 0.08, l / 2 - 0.06);
+    applyColor(wingletR, new THREE.Color('#141619'));
+    trimParts.push(stanchionL, stanchionR, wingletL, wingletR);
+  } else if (spec.id === 'suv') {
+    const railL = boxGeo(0.05, 0.05, spec.cabinLength * 0.85, spec.cabinWidth * 0.40, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.06, spec.cabinZ);
+    applyColor(railL, new THREE.Color('#b0b6c0'));
+    const railR = boxGeo(0.05, 0.05, spec.cabinLength * 0.85, -spec.cabinWidth * 0.40, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.06, spec.cabinZ);
+    applyColor(railR, new THREE.Color('#b0b6c0'));
+    const stepL = boxGeo(0.10, 0.04, spec.wheelBase * 0.70, w * 0.48, spec.bodyBottom * 0.75, 0);
+    applyColor(stepL, new THREE.Color('#22262c'));
+    const stepR = boxGeo(0.10, 0.04, spec.wheelBase * 0.70, -w * 0.48, spec.bodyBottom * 0.75, 0);
+    applyColor(stepR, new THREE.Color('#22262c'));
+    trimParts.push(railL, railR, stepL, stepR);
+  }
+
+  const trim = mergeParts(trimParts);
+
+  // ── Glass Greenhouse (windshield, side panes, and rear window) ──
+  const glassParts: THREE.BufferGeometry[] = [
+    // Raked front windshield
+    boxGeo(spec.cabinWidth * 0.88, spec.cabinHeight * 0.65, spec.cabinLength * 0.34, 0, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.32, spec.cabinZ + spec.cabinLength * 0.30),
+    // Side windows
+    boxGeo(spec.cabinWidth * 0.92, spec.cabinHeight * 0.58, spec.cabinLength * 0.65, 0, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.34, spec.cabinZ),
+  ];
+
+  if (spec.id !== 'pickup') {
+    // Raked rear backlite
+    glassParts.push(
+      boxGeo(spec.cabinWidth * 0.86, spec.cabinHeight * 0.60, spec.cabinLength * 0.30, 0, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.30, spec.cabinZ - spec.cabinLength * 0.32),
+    );
+  } else {
+    // Pickup vertical cab back window
+    glassParts.push(
+      boxGeo(spec.cabinWidth * 0.84, spec.cabinHeight * 0.52, 0.06, 0, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.34, spec.cabinZ - spec.cabinLength * 0.46),
+    );
+  }
+  const glass = mergeParts(glassParts);
+
+  // ── Headlights (dual projector lenses + amber corner signals) ──
   const head = mergeParts([
-    boxGeo(0.42, 0.2, 0.12, w * 0.3, spec.bodyBottom + spec.bodyHeight * 0.66, l / 2 - 0.04),
-    boxGeo(0.42, 0.2, 0.12, -w * 0.3, spec.bodyBottom + spec.bodyHeight * 0.66, l / 2 - 0.04),
+    boxGeo(0.38, 0.16, 0.10, w * 0.30, spec.bodyBottom + spec.bodyHeight * 0.66, l / 2 - 0.03),
+    boxGeo(0.38, 0.16, 0.10, -w * 0.30, spec.bodyBottom + spec.bodyHeight * 0.66, l / 2 - 0.03),
+    boxGeo(0.08, 0.14, 0.08, w * 0.44, spec.bodyBottom + spec.bodyHeight * 0.66, l / 2 - 0.03),
+    boxGeo(0.08, 0.14, 0.08, -w * 0.44, spec.bodyBottom + spec.bodyHeight * 0.66, l / 2 - 0.03),
   ]);
 
-  // Tail lights.
+  // ── Taillights (horizontal LED strip clusters) ──
   const tail = mergeParts([
-    boxGeo(0.4, 0.18, 0.1, w * 0.31, spec.bodyBottom + spec.bodyHeight * 0.66, -l / 2 + 0.03),
-    boxGeo(0.4, 0.18, 0.1, -w * 0.31, spec.bodyBottom + spec.bodyHeight * 0.66, -l / 2 + 0.03),
+    boxGeo(0.38, 0.14, 0.08, w * 0.30, spec.bodyBottom + spec.bodyHeight * 0.66, -l / 2 + 0.03),
+    boxGeo(0.38, 0.14, 0.08, -w * 0.30, spec.bodyBottom + spec.bodyHeight * 0.66, -l / 2 + 0.03),
+    boxGeo(w * 0.32, 0.06, 0.06, 0, spec.bodyBottom + spec.bodyHeight * 0.68, -l / 2 + 0.03),
   ]);
 
-  // Wheel: tyre + rim.
-  const tyre = new THREE.CylinderGeometry(spec.wheelRadius, spec.wheelRadius, 0.26, 14);
-  tyre.rotateZ(Math.PI / 2);
-  applyColor(tyre, new THREE.Color('#141619'));
-  const rim = new THREE.CylinderGeometry(spec.wheelRadius * 0.52, spec.wheelRadius * 0.52, 0.28, 12);
-  rim.rotateZ(Math.PI / 2);
-  applyColor(rim, new THREE.Color('#b9bfc6'));
-  const wheel = mergeParts([tyre, rim]);
+  // ── Wheels (tyre + brake rotor + caliper + 5-spoke alloy rim) ──
+  const wheelParts: THREE.BufferGeometry[] = [];
 
-  cached = { body: shell, glass, head, tail, wheel };
+  // Outer tyre tread and sidewalls
+  const tyre = new THREE.CylinderGeometry(spec.wheelRadius, spec.wheelRadius, 0.26, 16);
+  tyre.rotateZ(Math.PI / 2);
+  applyColor(tyre, new THREE.Color('#16181b'));
+  wheelParts.push(tyre);
+
+  // Rim barrel lip
+  const rimLip = new THREE.CylinderGeometry(spec.wheelRadius * 0.62, spec.wheelRadius * 0.62, 0.28, 14);
+  rimLip.rotateZ(Math.PI / 2);
+  applyColor(rimLip, new THREE.Color('#cfd5de'));
+  wheelParts.push(rimLip);
+
+  // Steel brake rotor disc
+  const rotor = new THREE.CylinderGeometry(spec.wheelRadius * 0.54, spec.wheelRadius * 0.54, 0.08, 12);
+  rotor.rotateZ(Math.PI / 2);
+  applyColor(rotor, new THREE.Color('#8a9098'));
+  wheelParts.push(rotor);
+
+  // Sport red brake caliper
+  const caliper = boxGeo(0.12, spec.wheelRadius * 0.30, spec.wheelRadius * 0.16, 0, spec.wheelRadius * 0.34, 0);
+  applyColor(caliper, new THREE.Color('#d62828'));
+  wheelParts.push(caliper);
+
+  // Center hub
+  const hub = new THREE.CylinderGeometry(spec.wheelRadius * 0.20, spec.wheelRadius * 0.20, 0.30, 10);
+  hub.rotateZ(Math.PI / 2);
+  applyColor(hub, new THREE.Color('#22262d'));
+  wheelParts.push(hub);
+
+  // 5 machined alloy spokes
+  const midR = spec.wheelRadius * 0.34;
+  for (let k = 0; k < 5; k++) {
+    const theta = (k * Math.PI * 2) / 5;
+    const spoke = new THREE.BoxGeometry(0.27, 0.05, spec.wheelRadius * 0.42);
+    spoke.rotateX(theta);
+    spoke.translate(0, Math.sin(theta) * midR, Math.cos(theta) * midR);
+    applyColor(spoke, new THREE.Color('#c5ccd6'));
+    wheelParts.push(spoke);
+  }
+
+  const wheel = mergeParts(wheelParts);
+
+  cached = { body: shell, trim, glass, head, tail, wheel };
   baseCache.set(spec.id, cached);
   return cached;
 }
 
-/** Per-livery paint for the shell. */
+/** Per-livery paint and trim assembly for the body. */
 function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferGeometry {
-  const geo = baseFor(spec).body.clone();
+  const base = baseFor(spec);
+  const geo = base.body.clone();
   const color = new THREE.Color(paint);
   const count = geo.getAttribute('position').count;
   const arr = new Float32Array(count * 3);
@@ -281,48 +458,73 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
   }
   geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
 
+  const extraParts: THREE.BufferGeometry[] = [geo, base.trim.clone()];
+
   if (livery === 'police') {
-    // Dark side panels for a black-and-white cruiser look, plus red/blue roof lightbar.
-    const roofY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.55;
-    const stripe = mergeParts([
-      boxGeo(spec.width * 1.01, spec.bodyHeight * 0.34, spec.length * 0.42, 0, spec.bodyBottom + spec.bodyHeight * 0.52, 0.1),
-    ]);
-    applyColor(stripe, new THREE.Color('#1a1f27'));
+    // White doors, roof lightbar, front bullbar
+    const roofY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.12;
+    const doorWhiteL = boxGeo(0.04, spec.bodyHeight * 0.44, spec.length * 0.38, spec.width * 0.48, spec.bodyBottom + spec.bodyHeight * 0.44, 0.05);
+    applyColor(doorWhiteL, new THREE.Color('#f4f6fa'));
+    extraParts.push(doorWhiteL);
 
-    const redBar = mergeParts([
-      boxGeo(spec.cabinWidth * 0.35, 0.12, 0.24, -spec.cabinWidth * 0.22, roofY, spec.cabinZ),
-    ]);
-    applyColor(redBar, new THREE.Color('#ff2244'));
+    const doorWhiteR = boxGeo(0.04, spec.bodyHeight * 0.44, spec.length * 0.38, -spec.width * 0.48, spec.bodyBottom + spec.bodyHeight * 0.44, 0.05);
+    applyColor(doorWhiteR, new THREE.Color('#f4f6fa'));
+    extraParts.push(doorWhiteR);
 
-    const blueBar = mergeParts([
-      boxGeo(spec.cabinWidth * 0.35, 0.12, 0.24, spec.cabinWidth * 0.22, roofY, spec.cabinZ),
-    ]);
-    applyColor(blueBar, new THREE.Color('#0088ff'));
+    // Roof lightbar mount
+    const barMount = boxGeo(spec.cabinWidth * 0.76, 0.05, 0.16, 0, roofY - 0.05, spec.cabinZ);
+    applyColor(barMount, new THREE.Color('#14171d'));
+    extraParts.push(barMount);
 
-    const mount = mergeParts([
-      boxGeo(spec.cabinWidth * 0.78, 0.05, 0.14, 0, roofY - 0.06, spec.cabinZ),
-    ]);
-    applyColor(mount, new THREE.Color('#14171d'));
+    // Red emergency strobe (left)
+    const redBar = boxGeo(spec.cabinWidth * 0.34, 0.12, 0.22, -spec.cabinWidth * 0.20, roofY, spec.cabinZ);
+    applyColor(redBar, new THREE.Color('#ff1838'));
+    extraParts.push(redBar);
 
-    const merged = mergeGeometries([geo, stripe, redBar, blueBar, mount], false)!;
-    geo.dispose();
-    stripe.dispose();
-    redBar.dispose();
-    blueBar.dispose();
-    mount.dispose();
-    return merged;
+    // Blue emergency strobe (right)
+    const blueBar = boxGeo(spec.cabinWidth * 0.34, 0.12, 0.22, spec.cabinWidth * 0.20, roofY, spec.cabinZ);
+    applyColor(blueBar, new THREE.Color('#0077ff'));
+    extraParts.push(blueBar);
+
+    // Center takedown
+    const takedown = boxGeo(spec.cabinWidth * 0.10, 0.10, 0.20, 0, roofY, spec.cabinZ);
+    applyColor(takedown, new THREE.Color('#f0f4ff'));
+    extraParts.push(takedown);
+
+    // Front push-bar / bullbar
+    const bullBarL = boxGeo(0.06, 0.32, 0.16, spec.width * 0.20, spec.bodyBottom + spec.bodyHeight * 0.35, spec.length / 2 + 0.10);
+    applyColor(bullBarL, new THREE.Color('#1a1d22'));
+    extraParts.push(bullBarL);
+
+    const bullBarR = boxGeo(0.06, 0.32, 0.16, -spec.width * 0.20, spec.bodyBottom + spec.bodyHeight * 0.35, spec.length / 2 + 0.10);
+    applyColor(bullBarR, new THREE.Color('#1a1d22'));
+    extraParts.push(bullBarR);
+
+    const crossBar = boxGeo(spec.width * 0.44, 0.06, 0.12, 0, spec.bodyBottom + spec.bodyHeight * 0.42, spec.length / 2 + 0.14);
+    applyColor(crossBar, new THREE.Color('#1a1d22'));
+    extraParts.push(crossBar);
+  } else if (livery === 'taxi') {
+    // Checkerboard stripe along the doors
+    const checkerL = boxGeo(0.04, spec.bodyHeight * 0.14, spec.length * 0.65, spec.width * 0.48, spec.bodyBottom + spec.bodyHeight * 0.48, 0);
+    applyColor(checkerL, new THREE.Color('#15181c'));
+    extraParts.push(checkerL);
+
+    const checkerR = boxGeo(0.04, spec.bodyHeight * 0.14, spec.length * 0.65, -spec.width * 0.48, spec.bodyBottom + spec.bodyHeight * 0.48, 0);
+    applyColor(checkerR, new THREE.Color('#15181c'));
+    extraParts.push(checkerR);
+
+    // Illuminated roof TAXI medallion sign
+    const roofY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.12;
+    const taxiBox = boxGeo(spec.cabinWidth * 0.42, 0.14, 0.26, 0, roofY, spec.cabinZ);
+    applyColor(taxiBox, new THREE.Color('#ffbb00'));
+    extraParts.push(taxiBox);
+
+    const taxiBase = boxGeo(spec.cabinWidth * 0.46, 0.04, 0.30, 0, roofY - 0.08, spec.cabinZ);
+    applyColor(taxiBase, new THREE.Color('#1a1d22'));
+    extraParts.push(taxiBase);
   }
-  if (livery === 'taxi') {
-    const checker = mergeParts([
-      boxGeo(spec.width * 1.01, spec.bodyHeight * 0.16, spec.length * 0.62, 0, spec.bodyBottom + spec.bodyHeight * 0.3, 0),
-    ]);
-    applyColor(checker, new THREE.Color('#16181d'));
-    const merged = mergeGeometries([geo, checker], false)!;
-    geo.dispose();
-    checker.dispose();
-    return merged;
-  }
-  return geo;
+
+  return mergeParts(extraParts);
 }
 
 export interface CarVisual {
@@ -344,13 +546,13 @@ export function createCarVisual(spec: CarSpec, paint: string, livery: Livery = '
 
   const glassMesh = new THREE.Mesh(base.glass.clone(), glassMaterial);
   glassMesh.castShadow = false;
-  group.add(glassMesh);
+  bodyMesh.add(glassMesh);
 
   const headMesh = new THREE.Mesh(base.head.clone(), headlightMaterial);
-  group.add(headMesh);
+  bodyMesh.add(headMesh);
 
   const tailMesh = new THREE.Mesh(base.tail.clone(), tailMaterial.clone());
-  group.add(tailMesh);
+  bodyMesh.add(tailMesh);
 
   const wheels: THREE.Mesh[] = [];
   const wheelPositions: [number, number][] = [
@@ -383,6 +585,7 @@ export function createCarVisual(spec: CarSpec, paint: string, livery: Livery = '
 export function disposeCarGeometry(): void {
   for (const entry of baseCache.values()) {
     entry.body.dispose();
+    entry.trim.dispose();
     entry.glass.dispose();
     entry.head.dispose();
     entry.tail.dispose();
