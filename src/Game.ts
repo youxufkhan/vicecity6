@@ -7,10 +7,11 @@ import { Sky } from './world/Sky';
 import { COLS, HALF_X, HALF_Z, SIDEWALK_WIDTH, roadCenterX, roadCenterZ } from './world/Layout';
 import { Player } from './entities/Player';
 import { Vehicle, resolveVehiclePairs } from './entities/Vehicle';
+import type { CollisionWorld } from './systems/Collision';
 import { TrafficManager, type TrafficAI } from './entities/Traffic';
 import { PedManager, type Pedestrian } from './entities/Pedestrian';
 import { FootCop, FootCopManager } from './entities/FootCop';
-import { CAR_SPECS, CIVIL_PAINT, headlightMaterial, tailMaterial, type Livery } from './entities/CarFactory';
+import { CAR_SPECS, CIVIL_PAINT, headlightMaterial, tailMaterial, bodyMaterial, glassMaterial, wheelMaterial, type Livery } from './entities/CarFactory';
 import { CameraRig } from './systems/CameraRig';
 import { Effects } from './systems/Effects';
 import { Wanted } from './systems/Wanted';
@@ -66,6 +67,7 @@ export class Game {
   private startCar: Vehicle | null = null;
   private pickups: Pickup[] = [];
   private neonLights: THREE.PointLight[] = [];
+  private beams: THREE.SpotLight[] = [];
   private markerMesh: THREE.Mesh;
   private markerRing: THREE.Mesh;
   private targetRing: THREE.Mesh;
@@ -130,6 +132,12 @@ export class Game {
       this.scene.add(light);
       return light;
     });
+    // Player headlight beams (always in the scene so the light count, and the shaders, never change).
+    for (let i = 0; i < 2; i++) {
+      const beam = new THREE.SpotLight(0xfff1cf, 0, 55, 0.5, 0.55, 1.4);
+      this.scene.add(beam, beam.target);
+      this.beams.push(beam);
+    }
     this.effects = new Effects(this.scene);
     this.footCops = new FootCopManager(this.scene);
 
@@ -700,6 +708,13 @@ export class Game {
     resolveVehiclePairs(allVehicles, this.onVehiclePairImpact);
     if (this.player.vehicle) this.player.updateInVehicle(dt, this.player.vehicle);
     this.handleVehicleImpacts(allVehicles);
+    // Badly hurt cars smoke from the bonnet.
+    for (const car of allVehicles) {
+      if (car.health < 30 && !car.wrecked && Math.random() < dt * 5) {
+        const f = car.forward;
+        this.effects.smoke(car.position.x + f.x * car.spec.length * 0.35, 0.9, car.position.z + f.z * car.spec.length * 0.35, 1, 0.5);
+      }
+    }
 
     /* ── traffic + police ── */
     this.traffic.updateTraffic(dt, world, this.player.position.x, this.player.position.z, this.elapsed, this.cameraRig.camera);
@@ -746,6 +761,7 @@ export class Game {
     for (const l of this.neonLights) l.intensity = night * 14;
     headlightMaterial.emissiveIntensity = 0.12 + night * 1.9;
     tailMaterial.emissiveIntensity = 0.3 + night * 0.5;
+    this.updateBeams(night);
 
     /* ── audio ── */
     this.updateAudio(dt);
@@ -1178,15 +1194,32 @@ export class Game {
     }
   }
 
+  /** Headlight beams on the player's car, brighter the darker it is. */
+  private updateBeams(night: number, car: Vehicle | null = this.player.vehicle): void {
+    const on = car !== null && !car.wrecked && night > 0.15;
+    for (let i = 0; i < this.beams.length; i++) {
+      const beam = this.beams[i];
+      beam.intensity = on ? 90 * night : 0;
+      if (!car) continue;
+      const side = i === 0 ? 1 : -1;
+      const fx = Math.sin(car.yaw);
+      const fz = Math.cos(car.yaw);
+      const rx = -fz;
+      const rz = fx;
+      const front = car.spec.length * 0.46;
+      beam.position.set(car.position.x + fx * front + rx * side * car.spec.width * 0.3, 0.75, car.position.z + fz * front + rz * side * car.spec.width * 0.3);
+      beam.target.position.set(beam.position.x + fx * 20, 0, beam.position.z + fz * 20);
+    }
+  }
+
   /* ─────────────────── audio ─────────────────── */
 
   private updateAudio(dt: number): void {
     void dt;
     const car = this.player.vehicle;
     if (car) {
-      const rpm = clamp01(Math.abs(car.forwardSpeed) / car.spec.topSpeed);
       const load = clamp01(Math.abs(car.throttle));
-      this.audio.setEngine(true, rpm * 0.8 + load * 0.2, load);
+      this.audio.setEngine(true, car.rpm * 0.85 + load * 0.15, load);
     } else {
       this.audio.setEngine(false, 0, 0);
     }
@@ -1272,6 +1305,7 @@ export class Game {
   /* ─────────────────── render ─────────────────── */
 
   private render(): void {
+    this.sky.updateEnvironment(this.renderer, [bodyMaterial, glassMaterial, wheelMaterial]);
     this.renderer.render(this.scene, this.cameraRig.camera);
   }
 
@@ -1612,6 +1646,77 @@ export class Game {
       }
     }
     return { built, failures, maxTriangles: Math.round(maxTriangles) };
+  }
+
+  /** Used by tests: tyre slip, handbrake, gears and visible damage on a free-standing car. */
+  debugDriving(): Record<string, number> {
+    const open = { resolveCircle: () => ({ hit: false, px: 0, pz: 0, nx: 0, nz: 0 }) } as unknown as CollisionWorld;
+    const run = (steer: number, handbrake: boolean, seconds: number, speed: number) => {
+      const car = new Vehicle(CAR_SPECS.sedan, '#3366cc');
+      car.velocity.set(0, 0, speed);
+      let peakSlide = 0;
+      const yaw0 = car.yaw;
+      for (let i = 0; i < seconds * 60; i++) {
+        car.setInput({ throttle: 0, steer, handbrake });
+        car.update(1 / 60, open);
+        peakSlide = Math.max(peakSlide, Math.abs(car.lateralSpeed));
+      }
+      const out = { peakSlide, speed: car.speed, yaw: Math.abs(car.yaw - yaw0) };
+      car.dispose();
+      return out;
+    };
+    const hard = run(1, false, 1.2, 28);
+    const gentle = run(0.15, false, 1.2, 28);
+    const hb = run(0.6, true, 1.0, 20);
+    const noHb = run(0.6, false, 1.0, 20);
+
+    const car = new Vehicle(CAR_SPECS.sedan, '#3366cc');
+    const nose = (): number => { // mean z of the vertices that start at the nose
+      const p = car.visual.bodyMesh.geometry.getAttribute('position');
+      let sum = 0;
+      let n = 0;
+      for (let i = 0; i < p.count; i++) {
+        if (restZ[i] > 1.5) { sum += p.getZ(i); n++; }
+      }
+      return sum / n;
+    };
+    const restZ = Float32Array.from({ length: car.visual.bodyMesh.geometry.getAttribute('position').count },
+      (_, i) => car.visual.bodyMesh.geometry.getAttribute('position').getZ(i));
+    const before = nose();
+    car.registerHit(Math.sin(car.yaw), Math.cos(car.yaw), 20); // hit on the nose
+    car.setInput({ throttle: 0, steer: 0, handbrake: false });
+    car.update(1 / 60, open);
+    const after = nose();
+    const result = {
+      hardSlide: hard.peakSlide,
+      gentleSlide: gentle.peakSlide,
+      handbrakeYaw: hb.yaw,
+      noHandbrakeYaw: noHb.yaw,
+      dentFront: car.damage.front,
+      dentRear: car.damage.rear,
+      noseMoved: before - after,
+    };
+    car.velocity.set(0, 0, 8);
+    car.update(1 / 60, open);
+    const lowGear = car.gear;
+    car.velocity.set(0, 0, CAR_SPECS.sedan.topSpeed * 0.95);
+    car.update(1 / 60, open);
+    const out = { ...result, lowGear, highGear: car.gear, rpm: car.rpm };
+    car.dispose();
+    return out;
+  }
+
+  /** Used by tests: reflections baked, headlight beams on at night when driving. */
+  debugLook(): Record<string, number | boolean> {
+    const car = this.traffic.parked.find((c) => !c.wrecked) ?? null;
+    this.sky.setClockFraction(0.02);
+    this.updateBeams(this.sky.night, car);
+    const beamNight = this.beams[0].intensity;
+    this.sky.setClockFraction(0.5);
+    this.updateBeams(this.sky.night, car);
+    const beamDay = this.beams[0].intensity;
+    this.render();
+    return { envBaked: bodyMaterial.envMap !== null && glassMaterial.envMap !== null, beamNight, beamDay };
   }
 
   /** Used by tests to inspect signal cycles. */

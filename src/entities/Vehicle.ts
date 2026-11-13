@@ -41,6 +41,17 @@ export class Vehicle {
   /** Set while the AI is driving, so traffic yields to the player. */
   horn = 0;
 
+  /** 0..1 dent amount per side of the body, from where it has been hit. */
+  readonly damage = { front: 0, rear: 0, left: 0, right: 0 };
+  /** 0..1 engine speed within the current gear (for the audio engine note). */
+  rpm = 0;
+  gear = 1;
+  private accelLong = 0;
+  private pitchVel = 0;
+  private rollVel = 0;
+  private dentDirty = false;
+  private bodyRest: { pos: Float32Array; col: Float32Array } | null = null;
+
   private wheelSpin = 0;
   private steerAngle = 0;
   private pitch = 0;
@@ -126,7 +137,13 @@ export class Vehicle {
     // Rolling resistance and drag.
     const drag = 0.6 + 0.0022 * forwardSpeed * forwardSpeed;
     const rolling = this.throttle === 0 || Math.sign(forwardSpeed) !== Math.sign(this.throttle);
-    const grip = this.handbrake ? 2.4 : spec.grip;
+    // Slip-based grip: once the tyres are sliding (lateral speed vs forward speed) they lose
+    // hold, so a hard turn at speed drifts instead of staying glued. Braking/accelerating
+    // shifts load off the tyres and costs a little more grip.
+    const slipRatio = Math.abs(lateral) / Math.max(Math.abs(forwardSpeed), 4);
+    const slipGrip = 1 - clamp((slipRatio - 0.22) / 0.5, 0, 1) * 0.55;
+    const loadGrip = 1 - 0.18 * clamp(Math.abs(this.accelLong) / 9, 0, 1);
+    const grip = this.handbrake ? 2.4 : spec.grip * slipGrip * loadGrip;
     lateral *= Math.exp(-grip * dt);
     const resistance = (rolling ? drag : 0) + (this.handbrake ? 11 + Math.abs(lateral) * 0.32 : 0);
     forwardSpeed = Math.sign(forwardSpeed) * Math.max(0, Math.abs(forwardSpeed) - resistance * dt);
@@ -137,6 +154,9 @@ export class Vehicle {
     const dir = forwardSpeed >= 0 ? 1 : -1;
     let yawRate = -this.steer * spec.steering * speedFactor * highSpeedFactor * dir;
 
+    // Locked rear wheels let the tail swing round: the handbrake turns much harder.
+    if (this.handbrake) yawRate *= 1.7;
+
     // Drifting adds rotation from the lateral slip.
     const slip = clamp(lateral / 9, -1, 1);
     if (Math.abs(lateral) > 1.2) yawRate += -slip * 0.55 * dir;
@@ -144,10 +164,13 @@ export class Vehicle {
     this.yaw += yawRate * dt;
     this.yaw = Math.atan2(Math.sin(this.yaw), Math.cos(this.yaw));
 
-    // Rebuild the velocity in the new frame.
-    const nfx = Math.sin(this.yaw);
-    const nfz = Math.cos(this.yaw);
-    this.velocity.set(nfx * forwardSpeed + -nfz * lateral, 0, nfz * forwardSpeed + nfx * lateral);
+    // Inertia: the car turns but its momentum does not, so the velocity keeps its world
+    // direction and the new heading sees the difference as sideways slip (decayed by the
+    // tyres next frame). That is what lets a fast turn or the handbrake break the tail loose.
+    const vx = fx * forwardSpeed + -fz * lateral;
+    const vz = fz * forwardSpeed + fx * lateral;
+    this.velocity.set(vx, 0, vz);
+    forwardSpeed = vx * Math.sin(this.yaw) + vz * Math.cos(this.yaw);
 
     // ── integrate ──
     this.position.x += this.velocity.x * dt;
@@ -157,7 +180,14 @@ export class Vehicle {
 
     this.collide(world);
 
+    // ── engine speed: five gears across the speed range ──
+    const sFrac = clamp01(Math.abs(forwardSpeed) / spec.topSpeed);
+    this.gear = Math.min(5, 1 + Math.floor(sFrac * 5));
+    const inGear = sFrac * 5 - (this.gear - 1);
+    this.rpm = clamp01(0.3 + 0.7 * clamp01(inGear) + Math.abs(this.throttle) * 0.08);
+
     // ── visuals ──
+    this.accelLong = (forwardSpeed - this.lastSpeed) / Math.max(dt, 0.0001);
     this.updateVisual(dt, forwardSpeed);
     this.lastSpeed = forwardSpeed;
   }
@@ -183,6 +213,7 @@ export class Vehicle {
         const torque = fx * hit.nz - fz * hit.nx;
         this.yaw += torque * impact * 0.012 * Math.sign(off || 1);
         if (impact > 3) {
+          this.registerHit(-hit.nx, -hit.nz, impact);
           this.applyDamage(impact * 1.5);
           this.lastImpactSpeed = impact;
         }
@@ -192,6 +223,59 @@ export class Vehicle {
 
   lastImpactSpeed = 0;
 
+  /** Record a hit from a world direction (car centre -> contact) so the matching side dents. */
+  registerHit(dirX: number, dirZ: number, impact: number): void {
+    const len = Math.hypot(dirX, dirZ) || 1;
+    const ux = dirX / len;
+    const uz = dirZ / len;
+    const along = ux * Math.sin(this.yaw) + uz * Math.cos(this.yaw);
+    const side = ux * -Math.cos(this.yaw) + uz * Math.sin(this.yaw); // + = right
+    const amount = clamp01(impact / 28);
+    if (along > 0.5) this.damage.front = clamp01(this.damage.front + amount);
+    else if (along < -0.5) this.damage.rear = clamp01(this.damage.rear + amount);
+    else if (side > 0) this.damage.right = clamp01(this.damage.right + amount);
+    else this.damage.left = clamp01(this.damage.left + amount);
+    this.dentDirty = true;
+  }
+
+  /** Push body vertices in on the damaged sides and dull the paint there. Cloned geometry only. */
+  private applyDents(): void {
+    this.dentDirty = false;
+    const geo = this.visual.bodyMesh.geometry;
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    const col = geo.getAttribute('color') as THREE.BufferAttribute | undefined;
+    if (!this.bodyRest) {
+      this.bodyRest = { pos: Float32Array.from(pos.array), col: col ? Float32Array.from(col.array) : new Float32Array(0) };
+    }
+    const rest = this.bodyRest;
+    const L = this.spec.length;
+    const W = this.spec.width;
+    const d = this.damage;
+    for (let i = 0; i < pos.count; i++) {
+      const x = rest.pos[i * 3];
+      const y = rest.pos[i * 3 + 1];
+      const z = rest.pos[i * 3 + 2];
+      // Same wobble for vertices at the same place, so the surface stays closed.
+      const wobble = 0.55 + 0.45 * Math.sin(x * 7 + y * 5 + z * 9);
+      const f = d.front * clamp01((z - L * 0.2) / (L * 0.3));
+      const r = d.rear * clamp01((-z - L * 0.2) / (L * 0.3));
+      const lft = d.left * clamp01((x - W * 0.2) / (W * 0.3));
+      const rgt = d.right * clamp01((-x - W * 0.2) / (W * 0.3));
+      pos.setXYZ(
+        i,
+        x - Math.sign(x) * 0.22 * (lft + rgt) * wobble,
+        y - 0.08 * (f + r) * wobble,
+        z - Math.sign(z) * 0.4 * (f + r) * wobble,
+      );
+      if (col && rest.col.length) {
+        const dark = 1 - 0.4 * clamp01(f + r + lft + rgt);
+        col.setXYZ(i, rest.col[i * 3] * dark, rest.col[i * 3 + 1] * dark, rest.col[i * 3 + 2] * dark);
+      }
+    }
+    pos.needsUpdate = true;
+    if (col) col.needsUpdate = true;
+  }
+
   private updateVisual(dt: number, forwardSpeed: number): void {
     this.group.position.set(this.position.x, 0, this.position.z);
     this.group.rotation.y = this.yaw;
@@ -200,8 +284,13 @@ export class Vehicle {
     const accel = (forwardSpeed - this.lastSpeed) / Math.max(dt, 0.0001);
     const targetPitch = clamp(-accel * 0.006, -0.06, 0.06);
     const targetRoll = clamp(this.lateralSpeed * 0.012, -0.09, 0.09);
-    this.pitch = damp(this.pitch, targetPitch, 6, dt);
-    this.roll = damp(this.roll, targetRoll, 6, dt);
+    // Spring-damper (not a plain lerp) so the body overshoots and settles: it dives under
+    // braking, squats on launch and rocks when the steering flips.
+    this.pitchVel += (70 * (targetPitch - this.pitch) - 9 * this.pitchVel) * dt;
+    this.rollVel += (70 * (targetRoll - this.roll) - 9 * this.rollVel) * dt;
+    this.pitch += this.pitchVel * dt;
+    this.roll += this.rollVel * dt;
+    if (this.dentDirty) this.applyDents();
     this.visual.bodyMesh.rotation.x = this.pitch;
     this.visual.bodyMesh.rotation.z = this.roll;
 
@@ -314,6 +403,8 @@ export function resolveVehiclePairs(
         onImpact?.(a, b, impact);
         a.applyDamage(impact * 0.55);
         b.applyDamage(impact * 0.55);
+        a.registerHit(nx, nz, impact);
+        b.registerHit(-nx, -nz, impact);
         a.lastImpactSpeed = Math.max(a.lastImpactSpeed, impact);
         b.lastImpactSpeed = Math.max(b.lastImpactSpeed, impact);
       }

@@ -216,15 +216,17 @@ export const CIVIL_PAINT: string[] = [
 
 export const bodyMaterial = new THREE.MeshStandardMaterial({
   vertexColors: true,
-  // Metalness stays moderate: there is no environment map, so high values render near-black.
-  roughness: 0.34,
-  metalness: 0.3,
+  // Reflects the baked sky cube (Sky.updateEnvironment), so it can be properly glossy.
+  roughness: 0.26,
+  metalness: 0.6,
+  envMapIntensity: 1.3,
 });
 
 export const glassMaterial = new THREE.MeshStandardMaterial({
   color: 0x0c1218,
-  roughness: 0.08,
+  roughness: 0.06,
   metalness: 0.90,
+  envMapIntensity: 1.6,
   transparent: true,
   opacity: 0.86,
 });
@@ -247,8 +249,9 @@ export const tailMaterial = new THREE.MeshStandardMaterial({
 
 export const wheelMaterial = new THREE.MeshStandardMaterial({
   vertexColors: true,
-  roughness: 0.52,
-  metalness: 0.38,
+  roughness: 0.45,
+  metalness: 0.5,
+  envMapIntensity: 0.9,
 });
 
 function boxGeo(w: number, h: number, d: number, x: number, y: number, z: number): THREE.BufferGeometry {

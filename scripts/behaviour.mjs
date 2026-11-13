@@ -311,12 +311,25 @@ check(models.built === 24, `all 6 car types build in all 4 liveries (${models.bu
 check(models.failures.length === 0, `no model build failures ${models.failures.join('; ')}`);
 check(models.maxTriangles < 7000, `heaviest car stays under 7000 triangles (${models.maxTriangles})`);
 
+console.log('\n── driving: tyre slip, handbrake, gears, damage ──');
+const drv = await page.evaluate(() => window.__game.debugDriving());
+check(drv.hardSlide > drv.gentleSlide * 2 && drv.hardSlide > 1.5, `a hard turn at speed slides (${drv.hardSlide.toFixed(1)} m/s vs ${drv.gentleSlide.toFixed(1)})`);
+check(drv.handbrakeYaw > drv.noHandbrakeYaw * 1.2, `handbrake swings the tail round (${drv.handbrakeYaw.toFixed(2)} vs ${drv.noHandbrakeYaw.toFixed(2)} rad)`);
+check(drv.lowGear < drv.highGear && drv.highGear === 5, `gears climb with speed (${drv.lowGear} -> ${drv.highGear})`);
+check(drv.dentFront > 0 && drv.dentRear === 0, 'a nose hit dents only the front');
+check(drv.noseMoved > 0.05, `the nose geometry is pushed in (${drv.noseMoved.toFixed(2)} m)`);
+
 console.log('\n── traffic signal cycles vary by district density ──');
 const cycles = await page.evaluate(() => {
   const g = window.__game;
   return g.debugTrafficCycles();
 });
 check(cycles.downtown > cycles.outer, `downtown cycle (${cycles.downtown}s) longer than perimeter (${cycles.outer}s)`);
+
+console.log('\n── look: reflections and headlight beams ──');
+const look = await page.evaluate(() => window.__game.debugLook());
+check(look.envBaked, 'car paint and glass have a baked sky reflection');
+check(look.beamNight > 20 && look.beamDay === 0, `headlight beams on at night (${look.beamNight.toFixed(0)}), off by day`);
 
 console.log('\n── touch play ──');
 const phone = await browser.newPage();

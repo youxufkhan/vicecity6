@@ -84,6 +84,10 @@ export class Sky {
   private time = 0;
   private sunDir = new THREE.Vector3(0.4, 0.7, 0.3);
   private nightAmount = 0;
+  private envScene: THREE.Scene | null = null;
+  private pmrem: THREE.PMREMGenerator | null = null;
+  private envTarget: THREE.WebGLRenderTarget | null = null;
+  private envBucket = -1;
 
   constructor(scene: THREE.Scene) {
     this.skyMat = new THREE.ShaderMaterial({
@@ -128,6 +132,32 @@ export class Sky {
     scene.add(this.group);
     scene.fog = new THREE.FogExp2(0xbfd8e8, 0.0022);
     this.apply();
+  }
+
+  /**
+   * Bake the current sky into a reflection cube and hand it to the given materials, so
+   * car paint, glass and rims reflect sky colour (warm at dusk, dark at night). Rebuilt
+   * every 1/20 of a day. Only the listed materials get it, so buildings and roads keep
+   * their tuned look.
+   */
+  updateEnvironment(renderer: THREE.WebGLRenderer, materials: THREE.MeshStandardMaterial[]): void {
+    const bucket = Math.round(this.dayFraction * 20);
+    if (bucket === this.envBucket && this.envTarget) return;
+    this.envBucket = bucket;
+    if (!this.envScene) {
+      this.envScene = new THREE.Scene();
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(50, 24, 14), this.skyMat);
+      dome.frustumCulled = false;
+      this.envScene.add(dome);
+      this.pmrem = new THREE.PMREMGenerator(renderer);
+    }
+    const target = this.pmrem!.fromScene(this.envScene, 0, 0.1, 200);
+    this.envTarget?.dispose();
+    this.envTarget = target;
+    for (const m of materials) {
+      m.envMap = target.texture;
+      m.needsUpdate = true;
+    }
   }
 
   get night(): number {

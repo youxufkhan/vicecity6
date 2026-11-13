@@ -127,6 +127,30 @@ box, slab test in the car's frame, so a bullet stops at the bodywork instead of
 the centre) and the ground plane. The height of the hit selects the damage zone
 (head above 1.5 m, legs below 0.75 m).
 
+## Tyre slip, weight transfer, damage
+
+- **Inertia.** When the car turns, its velocity keeps its world direction; the new
+  heading sees the difference as lateral slip, which the tyres then bleed off
+  (`lateral *= exp(-grip dt)`). Grip itself falls once slip ratio
+  (|lateral| / max(|forward|, 4)) passes 0.22, down to 55 %, and costs up to 18 % more
+  under hard braking or acceleration. A fast full-lock turn therefore drifts; the
+  handbrake drops grip to 2.4 and multiplies yaw rate by 1.7.
+- **Body attitude** is a spring-damper (k 70, c 9), so the body dives, squats and rocks
+  with overshoot instead of easing in.
+- **Gears.** `Vehicle.gear` (1-5) and `rpm` come from speed across the range; the
+  audio engine note uses `rpm`.
+- **Damage.** `registerHit(dirX, dirZ, impact)` adds 0..1 dent to front/rear/left/right.
+  `applyDents` moves the matching body vertices inward (wobble keyed on position, so
+  shared vertices move together) and darkens the paint. Only the car's own cloned body
+  geometry is touched. Cars under 30 % health smoke.
+
+## Reflections and headlights
+
+`Sky.updateEnvironment` renders the sky dome into a PMREM cube every 1/20 of a day and
+assigns it only to the car paint, glass and wheel materials (`envMap`), so buildings
+and roads keep their tuned look. At night the player's car has two spot lights
+(`Game.updateBeams`); other cars rely on emissive headlights.
+
 ## Front-wheel steering
 
 Wheels are rotated in `YXZ` order: spin about the axle first, then steer about
