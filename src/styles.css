@@ -1162,3 +1162,12 @@ kbd {
     width: 88vw;
   }
 }
+
+/* Hit feedback and spread-driven gap */
+.crosshair i { transition: transform 0.06s ease-out, background 0.06s; }
+.crosshair i:nth-child(1) { transform: translateY(calc(var(--gap, 4px) * -0.5)); }
+.crosshair i:nth-child(2) { transform: translateY(calc(var(--gap, 4px) * 0.5)); }
+.crosshair.hit i { background: #ffd34d; }
+.crosshair.kill i { background: #ff3b3b; }
+.crosshair i:nth-child(3) { transform: translateX(calc(var(--gap, 4px) * -0.5)); }
+.crosshair i:nth-child(4) { transform: translateX(calc(var(--gap, 4px) * 0.5)); }

@@ -289,6 +289,22 @@ check(copShoot.hit, 'bullet hitscan detects officer on foot');
 check(copShoot.killed, 'damage to officer on foot kills them');
 check(!copShoot.copAlive, 'dead officer is marked not alive');
 
+console.log('\n── weapons: spread, recoil, hit detection ──');
+const shooting = await page.evaluate(() => window.__game.debugShooting());
+check(shooting.carKind === 'vehicle' && shooting.carDistance < 11.5, `ray hits the car's front face, not its centre (${shooting.carDistance} m)`);
+check(shooting.missKind !== 'vehicle', 'ray passing beside a car misses it');
+check(shooting.groundKind === 'ground', 'downward ray hits the ground');
+check(shooting.hipSpread > shooting.aimSpread, 'hip fire is less accurate than aimed fire');
+check(shooting.movingSpread > shooting.hipSpread, 'moving widens the spread');
+check(shooting.fired === 1 && shooting.kickPitch > 0, 'a shot kicks the camera upward');
+
+console.log('\n── traffic spawns without pop-in or overlap ──');
+const spawn = await page.evaluate(() => window.__game.debugTrafficSpawn(40));
+check(spawn.spawned > 0, `traffic keeps spawning (${spawn.spawned})`);
+check(spawn.popIns === 0, `no car appears on screen (${spawn.popIns})`);
+check(spawn.popOuts === 0, `no car vanishes on screen (${spawn.popOuts})`);
+check(spawn.overlaps === 0, `no two traffic cars overlap (${spawn.overlaps} frames)`);
+
 console.log('\n── traffic signal cycles vary by district density ──');
 const cycles = await page.evaluate(() => {
   const g = window.__game;

@@ -779,6 +779,8 @@ export function createCarVisual(spec: CarSpec, paint: string, livery: Livery = '
   ];
   for (const [x, z] of wheelPositions) {
     const wheel = new THREE.Mesh(base.wheel.clone(), wheelMaterial);
+    // YXZ: spin about the axle first, then steer about the vertical axis.
+    wheel.rotation.order = 'YXZ';
     wheel.position.set(x, spec.wheelRadius, z);
     wheel.castShadow = true;
     group.add(wheel);

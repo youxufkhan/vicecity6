@@ -207,11 +207,18 @@ export class Vehicle {
 
     // Wheels.
     this.wheelSpin += (forwardSpeed / this.spec.wheelRadius) * dt;
-    this.steerAngle = damp(this.steerAngle, this.steer * 0.52, 12, dt);
+    // Lock shrinks with speed like a real rack; rate-limited so wheels don't snap.
+    const lock = 0.62 - 0.38 * clamp01(Math.abs(forwardSpeed) / this.spec.topSpeed);
+    this.steerAngle = damp(this.steerAngle, this.steer * lock, 9, dt);
     const wheels = this.visual.wheels;
     if (wheels.length === 4) {
-      wheels[0].rotation.set(this.wheelSpin, this.steerAngle, 0);
-      wheels[1].rotation.set(this.wheelSpin, this.steerAngle, 0);
+      // Ackermann: the inside wheel turns more than the outside one.
+      const inner = Math.atan(Math.tan(this.steerAngle) / Math.max(0.4, 1 - Math.abs(Math.tan(this.steerAngle)) * (this.spec.track / this.spec.wheelBase) * 0.5));
+      const left = this.steerAngle >= 0 ? this.steerAngle : inner;
+      const right = this.steerAngle >= 0 ? inner : this.steerAngle;
+      // Positive steer = right = yaw decreases, so the wheel's Y angle is negated.
+      wheels[0].rotation.set(this.wheelSpin, -left, 0);
+      wheels[1].rotation.set(this.wheelSpin, -right, 0);
       wheels[2].rotation.set(this.wheelSpin, 0, 0);
       wheels[3].rotation.set(this.wheelSpin, 0, 0);
     }

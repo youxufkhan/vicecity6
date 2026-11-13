@@ -400,16 +400,20 @@ export class TrafficManager {
   }
 
   /** Traffic vehicles around the player. */
-  updateTraffic(dt: number, world: CollisionWorld, playerX: number, playerZ: number, time: number): void {
+  updateTraffic(dt: number, world: CollisionWorld, playerX: number, playerZ: number, time: number, camera?: THREE.Camera): void {
     this.time = time;
     void dt;
+    camera?.updateMatrixWorld();
     const context = { vehicles: [] as Vehicle[] };
 
     // Recycle traffic that is too far away.
     for (let i = this.traffic.length - 1; i >= 0; i--) {
       const car = this.traffic[i];
       const d = dist2D(car.position.x, car.position.z, playerX, playerZ);
-      if (d > 220) {
+      // Never delete a car the player can see: that reads as a car vanishing.
+      if (d > 220 && (d > 320 || !this.inView(car.position.x, car.position.z, camera))) {
+        // Beyond 320 m a car is a speck inside the fog; only closer deletions count as a vanish.
+        if (d <= 320 && this.inView(car.position.x, car.position.z, camera)) this.popOuts++;
         this.traffic.splice(i, 1);
         this.removeFromScene(car);
       }
@@ -420,7 +424,7 @@ export class TrafficManager {
       for (let attempt = 0; attempt < 10; attempt++) {
         const node = this.roads.nodes[this.rng.int(0, this.roads.nodes.length - 1)];
         const d = dist2D(node.x, node.z, playerX, playerZ);
-        if (d < 40 || d > 190) continue;
+        if (d < 70 || d > 200) continue;
         if (node.edges.length === 0) continue;
 
         // Pick an outgoing edge and drop the car into the correct lane,
@@ -437,19 +441,22 @@ export class TrafficManager {
         const rz = ux;
         const along = len * this.rng.range(0.18, 0.82);
 
+        const sx = node.x + ux * along + rx * LANE_OFFSET;
+        const sz = node.z + uz * along + rz * LANE_OFFSET;
+        // Pop-in and z-fighting guards: not on screen, not on top of another car.
+        if (this.inView(sx, sz, camera) || dist2D(sx, sz, playerX, playerZ) < 70) continue;
+        if (this.occupied(sx, sz)) continue;
+
         const spec = this.randomSpec();
         const car = new Vehicle(spec, this.randomPaint());
-        car.position.set(
-          node.x + ux * along + rx * LANE_OFFSET,
-          0,
-          node.z + uz * along + rz * LANE_OFFSET,
-        );
+        car.position.set(sx, 0, sz);
         car.yaw = Math.atan2(ux, uz);
         car.driver = 'ai';
         const ai = new TrafficAI(this.roads, node.id, other, this.rng.int(1, 1_000_000));
         ai.roadContext = context;
         ai.time = this.time;
         car.ai = ai;
+        if (this.inView(sx, sz, camera)) this.popIns++;
         this.addToScene(car);
         this.traffic.push(car);
         spawned = true;
@@ -462,6 +469,26 @@ export class TrafficManager {
     if (this.playerVehicle) context.vehicles.push(this.playerVehicle);
     void world;
   }
+
+  /** True when a ground point projects inside (a padded) camera view. */
+  private inView(x: number, z: number, camera?: THREE.Camera): boolean {
+    if (!camera) return false;
+    this.probe.set(x, 1, z).project(camera);
+    return this.probe.z < 1 && Math.abs(this.probe.x) < 1.25 && Math.abs(this.probe.y) < 1.4;
+  }
+
+  /** Whether any existing vehicle is within a car-length of this point. */
+  private occupied(x: number, z: number): boolean {
+    for (const list of [this.traffic, this.parked, this.police]) {
+      for (const c of list) if (dist2D(c.position.x, c.position.z, x, z) < 9) return true;
+    }
+    return !!this.playerVehicle && dist2D(this.playerVehicle.position.x, this.playerVehicle.position.z, x, z) < 9;
+  }
+
+  private probe = new THREE.Vector3();
+  /** Counters for tests: cars created or deleted while on screen (should stay 0). */
+  popIns = 0;
+  popOuts = 0;
 
   updatePolice(dt: number, world: CollisionWorld, playerPos: THREE.Vector3, playerVel: THREE.Vector3, time: number): void {
     this.time = time;

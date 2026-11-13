@@ -23,6 +23,10 @@ export interface HudState {
   reserve: number;
   inVehicle: boolean;
   aiming: boolean;
+  /** Crosshair gap in px, from the weapon's current spread. */
+  spread: number;
+  /** 0 none, 1 hit, 2 kill. */
+  hitMarker: number;
 }
 
 const BLIP_COLORS: Record<RadarBlip['kind'], string> = {
@@ -50,6 +54,7 @@ export class HUD {
   private missionObjective = document.getElementById('mission-objective')!;
   private toastBox = document.getElementById('toasts')!;
   private crosshairEl = document.getElementById('crosshair')!;
+  private lastSpread = -1;
   private promptEl = document.getElementById('prompt')!;
   private damageEl = document.getElementById('damage-flash')!;
   private wantedFlashEl = document.getElementById('wanted-flash')!;
@@ -130,6 +135,12 @@ export class HUD {
     }
 
     this.crosshairEl.classList.toggle('show', state.aiming);
+    this.crosshairEl.classList.toggle('hit', state.hitMarker === 1);
+    this.crosshairEl.classList.toggle('kill', state.hitMarker === 2);
+    if (state.spread !== this.lastSpread) {
+      this.lastSpread = state.spread;
+      this.crosshairEl.style.setProperty('--gap', `${Math.min(40, 4 + state.spread)}px`);
+    }
     this.speedLinesEl.style.opacity = state.inVehicle && state.speedKph > 150 ? '0.55' : '0';
     this.drawSpeedo(state.speedKph, state.maxKph);
   }

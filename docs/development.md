@@ -10,7 +10,7 @@
 | three | 0.169 | Renderer, scene graph, maths |
 | puppeteer-core | 23.6 | Headless Chrome for the test suites |
 
-No runtime dependencies beyond three. No binary assets, no network calls at
+No runtime dependencies beyond three. Binary assets limited to `.glb` models, no network calls at
 runtime, no build step for content.
 
 ## Commands
@@ -65,9 +65,10 @@ the traffic AI and the camera. Changing one means changing all of them.
 reproducible (city layout, spawn placement). `Math.random()` is acceptable for
 purely cosmetic jitter (particle noise, weapon spread).
 
-**Assets.** No binary assets. If you need a new texture, draw it on a canvas in
-`core/Textures.ts`. If you need a new mesh, build it from primitives in the
-relevant `entities/` or `world/` file and merge it.
+**Assets.** Textures are drawn on a canvas in `core/Textures.ts`; sounds are
+synthesised. Vehicles, characters and weapons may be `.glb` models authored in
+SolidCraft (recipes in `scripts/models/`, output in `src/assets/models/`), always
+with a procedural fallback. Simple props are still built from primitives and merged.
 
 **Performance.** Repeated objects are `InstancedMesh`. Static geometry is
 merged per material. Check `renderer.info.render.calls` after a change — the

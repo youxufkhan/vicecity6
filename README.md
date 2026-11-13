@@ -28,7 +28,7 @@
 
 Steal vehicles, complete multi-stage criminal missions, drift down palm-lined avenues, and outrun an escalating five-star police response through dynamic day-and-night cycles.
 
-- ⚡ **Zero Binary Assets**: Every texture is procedurally painted on an `OffscreenCanvas`, every vehicle and building is built from mathematical primitives, and every gunshot, tire screech, and synthwave tune is synthesised via the Web Audio API.
+- ⚡ **Minimal Binary Assets**: Every texture is procedurally painted on an `OffscreenCanvas`, buildings are built from primitives, vehicles/characters/weapons are `.glb` models authored in SolidCraft, and every gunshot, tire screech, and synthwave tune is synthesised via the Web Audio API.
 - 🌐 **Completely Offline**: Makes zero runtime network requests and caches cleanly.
 - 🎯 **Fixed 60Hz Physics & AI**: Deterministic arcade car handling, road-graph traffic AI, pedestrian navigation, and tactical police AI.
 

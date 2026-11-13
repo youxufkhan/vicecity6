@@ -5,8 +5,8 @@
 VICE CITY 6 is a single-page browser game: one `HTMLCanvasElement`, one
 `THREE.WebGLRenderer`, one `THREE.Scene`, and a simulation that advances in
 fixed 60 Hz steps. There is no server, no persistence beyond `localStorage`
-for settings, and no binary assets — every texture, mesh and sound is
-generated at runtime.
+for settings, and no binary assets beyond SolidCraft-authored `.glb` models — every
+texture and sound is generated at runtime.
 
 ```
 src/

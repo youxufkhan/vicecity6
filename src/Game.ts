@@ -93,6 +93,8 @@ export class Game {
     reserve: 0,
     inVehicle: false,
     aiming: false,
+    spread: 0,
+    hitMarker: 0,
   };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -659,7 +661,15 @@ export class Game {
       const firePressed = input.mouseJustPressed(0) || touchFire;
       const fireHeld = input.mouseDown(0) || input.touchDown('fire');
       const wantFire = input.pressed('KeyF') || (aiming && (firePressed || (this.weapons.def.automatic && fireHeld)));
+      this.weapons.moveFactor = clamp(Math.hypot(this.player.velocity.x, this.player.velocity.z) / 7, 0, 1);
       this.weapons.update(dt, wantFire, input.pressed('KeyR'));
+      // Drain accumulated recoil into the camera (muzzle climb).
+      const kick = this.weapons.kick;
+      if (kick.pitch !== 0 || kick.yaw !== 0) {
+        this.cameraRig.look(kick.yaw, -kick.pitch);
+        kick.pitch = 0;
+        kick.yaw = 0;
+      }
       if (input.pressed('KeyQ')) this.weapons.cycleWeapon();
     }
     if (driving && input.pressed('KeyH')) {
@@ -692,7 +702,7 @@ export class Game {
     this.handleVehicleImpacts(allVehicles);
 
     /* ── traffic + police ── */
-    this.traffic.updateTraffic(dt, world, this.player.position.x, this.player.position.z, this.elapsed);
+    this.traffic.updateTraffic(dt, world, this.player.position.x, this.player.position.z, this.elapsed, this.cameraRig.camera);
 
     /* ── pedestrians ── */
     this.peds.update(dt, world, this.player.position.x, this.player.position.z, allVehicles);
@@ -1202,6 +1212,8 @@ export class Game {
     state.day = Math.floor((this.elapsed / this.sky.dayLength) % 7);
     state.inVehicle = car !== null;
     state.aiming = this.weapons.aiming;
+    state.spread = Math.round(this.weapons.currentSpread * 400);
+    state.hitMarker = this.weapons.hitMarker > 0 ? (this.weapons.lastHitKill ? 2 : 1) : 0;
     state.speedKph = car ? car.speedKph : 0;
     state.maxKph = car ? car.spec.topSpeed * 3.6 : 220;
     state.weapon = this.weapons.def.name;
@@ -1391,6 +1403,8 @@ export class Game {
    * Third person aiming: the camera ray decides the aim point on the chest
    * plane, then the bullet is fired from the player's muzzle towards it.
    */
+  private aimProbe = new THREE.Vector3();
+
   private updateAim(): void {
     const cam = this.cameraRig.camera;
     const dir = this.weaponAimDir;
@@ -1404,6 +1418,12 @@ export class Game {
       t = (1.25 - cam.position.y) / dir.y;
       t = clamp(t, 1.5, 250);
     }
+    // Aim at whatever is actually under the crosshair (start the ray at the player so the
+    // camera boom and anything behind the player cannot block it).
+    const toPlayer = Math.max(0, (this.player.position.x - cam.position.x) * dir.x + (this.player.position.z - cam.position.z) * dir.z);
+    const probe = this.aimProbe.set(cam.position.x + dir.x * toPlayer, cam.position.y + dir.y * toPlayer, cam.position.z + dir.z * toPlayer);
+    const seen = this.weapons.hitscan(probe, dir, 250);
+    if (seen.hit && seen.kind !== 'ground') t = toPlayer + seen.distance;
     const aimX = cam.position.x + dir.x * t;
     const aimY = cam.position.y + dir.y * t;
     const aimZ = cam.position.z + dir.z * t;
@@ -1484,6 +1504,67 @@ export class Game {
     const targetCop = hit.kind === 'cop' && hit.cop ? hit.cop : cop;
     const killed = targetCop.damage(100);
     return { hit: hit.kind === 'cop', killed, copAlive: targetCop.alive };
+  }
+
+  /** Drive around for a while and report pop-in/out and overlapping traffic. */
+  debugTrafficSpawn(seconds: number): { popIns: number; popOuts: number; overlaps: number; spawned: number } {
+    this.traffic.popIns = 0;
+    this.traffic.popOuts = 0;
+    let overlaps = 0;
+    const seen = new Set<Vehicle>(this.traffic.traffic);
+    let spawned = 0;
+    for (let i = 0; i < seconds * 10; i++) {
+      if (i % 5 === 0) this.player.position.z += 10; // roughly 20 m/s of travel
+      this.simulate(0.1);
+      const cars = this.traffic.traffic;
+      for (const c of cars) if (!seen.has(c)) { seen.add(c); spawned++; }
+      for (let a = 0; a < cars.length; a++) {
+        for (let b = a + 1; b < cars.length; b++) {
+          if (dist2D(cars[a].position.x, cars[a].position.z, cars[b].position.x, cars[b].position.z) < 1.5) overlaps++;
+        }
+      }
+    }
+    return { popIns: this.traffic.popIns, popOuts: this.traffic.popOuts, overlaps, spawned };
+  }
+
+  /** Used by tests: weapon spread, recoil and hit detection against a car and the ground. */
+  debugShooting(): Record<string, number | string> {
+    const w = this.weapons;
+    const o = new THREE.Vector3(0, 1.3, 0);
+    const car = this.traffic.parked[0];
+    // Park a target car 12 m ahead and shoot at its front face.
+    const saved = { x: car.position.x, z: car.position.z, yaw: car.yaw };
+    car.position.set(0, 0, 12);
+    car.yaw = 0;
+    const hitCar = w.hitscan(o, new THREE.Vector3(0, -0.02, 1).normalize(), 60);
+    const missCar = w.hitscan(o, new THREE.Vector3(0.5, 0, 1).normalize(), 60);
+    const down = w.hitscan(o, new THREE.Vector3(0, -1, 0.3).normalize(), 60);
+    car.position.set(saved.x, 0, saved.z);
+    car.yaw = saved.yaw;
+    w.aiming = true;
+    w.moveFactor = 0;
+    const aimSpread = w.currentSpread;
+    w.aiming = false;
+    const hipSpread = w.currentSpread;
+    w.moveFactor = 1;
+    const movingSpread = w.currentSpread;
+    w.moveFactor = 0;
+    w.kick.pitch = 0;
+    this.weaponAimOrigin.set(0, 1.3, 0);
+    this.weaponAimDir.set(0, 0, 1);
+    const before = w.shotsFired;
+    w.update(0.2, true, false);
+    return {
+      carKind: hitCar.kind,
+      carDistance: Math.round(hitCar.distance * 10) / 10,
+      missKind: missCar.kind,
+      groundKind: down.kind,
+      aimSpread,
+      hipSpread,
+      movingSpread,
+      kickPitch: w.kick.pitch,
+      fired: w.shotsFired - before,
+    };
   }
 
   /** Used by tests to inspect signal cycles. */

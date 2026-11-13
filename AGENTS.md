@@ -3,7 +3,8 @@
 Operating rules for agents (and humans) working in this repository.
 
 **VICE CITY 6 — Neon Coast** is a browser game: Three.js + TypeScript + Vite,
-one canvas, one scene, a fixed 60 Hz simulation, and no binary assets.
+one canvas, one scene, a fixed 60 Hz simulation. Textures and audio are procedural; 3D models may be
+binary `.glb` files authored in SolidCraft.
 
 ---
 
@@ -79,9 +80,13 @@ breaking it produced a real, shipped bug.
   dead code.
 - Comments explain *why*, not *what*. If a constant or a formula needs a
   note (drag coefficients, lane offsets, sign conventions), write the note.
-- No binary assets. Textures are drawn on a canvas
-  (`core/Textures.ts`), meshes are built from primitives and merged, sounds
-  are synthesised (`systems/Audio.ts`).
+- Binary model assets are allowed: author vehicles, characters and weapons in
+  SolidCraft (MCP), export `.glb` (metres, Y up) to `src/assets/models/`, and
+  load them through one loader (imported with Vite `?url`). Keep each model
+  under ~300 KB and ~15k triangles; keep the source recipe (batch JSON) in
+  `scripts/models/` so models stay reproducible. Textures are still drawn on a
+  canvas (`core/Textures.ts`) and sounds are synthesised (`systems/Audio.ts`).
+  Always keep a procedural fallback so a failed load never blocks the game.
 - Anything that must be reproducible uses `rngFrom(seed)`. `Math.random()` is
   only for cosmetic jitter.
 - Repeated objects are `InstancedMesh`; static geometry is merged per
