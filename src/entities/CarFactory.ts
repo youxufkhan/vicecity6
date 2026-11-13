@@ -1,6 +1,57 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { applyColor } from '../world/GeoUtil';
+import sedanModel from '../assets/models/sedan.json';
+import coupeModel from '../assets/models/coupe.json';
+import suvModel from '../assets/models/suv.json';
+import vanModel from '../assets/models/van.json';
+import pickupModel from '../assets/models/pickup.json';
+import sportsModel from '../assets/models/sports.json';
+import wheelModel from '../assets/models/wheel.json';
+
+/** Compact SolidCraft-authored model (see scripts/models/optimize.mjs). */
+interface ModelPart { group: string; name: string; color: number[]; pos: number[]; idx: number[] }
+interface CarModel { meta: { roofTop?: number; roofZ?: number }; parts: ModelPart[] }
+
+/** Car models authored in SolidCraft; specs without one fall back to the procedural build. */
+const CAR_MODELS: Record<string, CarModel> = {
+  sedan: sedanModel as CarModel,
+  coupe: coupeModel as CarModel,
+  suv: suvModel as CarModel,
+  van: vanModel as CarModel,
+  pickup: pickupModel as CarModel,
+  sports: sportsModel as CarModel,
+};
+const WHEEL_MODEL = wheelModel as CarModel;
+/** The wheel model's tyre radius in metres; scaled per car. */
+const WHEEL_MODEL_RADIUS = 0.35;
+
+/** Merge one group of model parts into a vertex-coloured geometry (smooth normals, creased at hard edges). */
+function groupGeometry(model: CarModel, group: string, scale = 1): THREE.BufferGeometry {
+  const pieces: THREE.BufferGeometry[] = [];
+  for (const part of model.parts) {
+    if (part.group !== group) continue;
+    let g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(part.pos, (v) => (v / 1000) * scale), 3));
+    g.setIndex(part.idx);
+    g = toCreasedNormals(g, 0.6); // non-indexed, with normals
+    const n = g.getAttribute('position').count;
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) col.set(part.color, i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    pieces.push(g);
+  }
+  return mergeGeometries(pieces, false)!;
+}
+
+function roofTopFor(spec: CarSpec): number {
+  return CAR_MODELS[spec.id]?.meta.roofTop ?? spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.05;
+}
+
+function roofZFor(spec: CarSpec): number {
+  return CAR_MODELS[spec.id]?.meta.roofZ ?? spec.cabinZ;
+}
 
 export type Livery = 'civil' | 'police' | 'taxi' | 'sport';
 
@@ -165,8 +216,9 @@ export const CIVIL_PAINT: string[] = [
 
 export const bodyMaterial = new THREE.MeshStandardMaterial({
   vertexColors: true,
-  roughness: 0.26,
-  metalness: 0.65,
+  // Metalness stays moderate: there is no environment map, so high values render near-black.
+  roughness: 0.34,
+  metalness: 0.3,
 });
 
 export const glassMaterial = new THREE.MeshStandardMaterial({
@@ -206,8 +258,12 @@ function boxGeo(w: number, h: number, d: number, x: number, y: number, z: number
 }
 
 function mergeParts(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const merged = mergeGeometries(parts, false)!;
+  // mergeGeometries returns null when indexed and non-indexed parts are mixed (model parts vs box props).
+  const flat = parts.map((p) => (p.index ? p.toNonIndexed() : p));
+  const merged = mergeGeometries(flat, false);
+  if (!merged) throw new Error('car geometry merge failed: attribute mismatch');
   for (const p of parts) p.dispose();
+  for (const p of flat) if (!parts.includes(p)) p.dispose();
   return merged;
 }
 
@@ -227,6 +283,20 @@ const baseCache = new Map<
 function baseFor(spec: CarSpec) {
   let cached = baseCache.get(spec.id);
   if (cached) return cached;
+
+  const model = CAR_MODELS[spec.id];
+  if (model) {
+    cached = {
+      body: groupGeometry(model, 'body'),
+      trim: groupGeometry(model, 'trim'),
+      glass: groupGeometry(model, 'glass'),
+      head: groupGeometry(model, 'head'),
+      tail: groupGeometry(model, 'tail'),
+      wheel: groupGeometry(WHEEL_MODEL, 'wheel', spec.wheelRadius / WHEEL_MODEL_RADIUS),
+    };
+    baseCache.set(spec.id, cached);
+    return cached;
+  }
 
   const w = spec.width;
   const l = spec.length;
@@ -638,7 +708,7 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
 
   if (livery === 'police') {
     // White doors, roof lightbar, front bullbar
-    const roofY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.12;
+    const roofY = roofTopFor(spec) + 0.07;
     const doorWhiteL = boxGeo(0.04, spec.bodyHeight * 0.44, spec.length * 0.38, spec.width * 0.48, spec.bodyBottom + spec.bodyHeight * 0.44, 0.05);
     applyColor(doorWhiteL, new THREE.Color('#f4f6fa'));
     extraParts.push(doorWhiteL);
@@ -648,22 +718,22 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
     extraParts.push(doorWhiteR);
 
     // Roof lightbar mount
-    const barMount = boxGeo(spec.cabinWidth * 0.76, 0.05, 0.16, 0, roofY - 0.05, spec.cabinZ);
+    const barMount = boxGeo(spec.cabinWidth * 0.76, 0.05, 0.16, 0, roofY - 0.05, roofZFor(spec));
     applyColor(barMount, new THREE.Color('#14171d'));
     extraParts.push(barMount);
 
     // Red emergency strobe (left)
-    const redBar = boxGeo(spec.cabinWidth * 0.34, 0.12, 0.22, -spec.cabinWidth * 0.20, roofY, spec.cabinZ);
+    const redBar = boxGeo(spec.cabinWidth * 0.34, 0.12, 0.22, -spec.cabinWidth * 0.20, roofY, roofZFor(spec));
     applyColor(redBar, new THREE.Color('#ff1838'));
     extraParts.push(redBar);
 
     // Blue emergency strobe (right)
-    const blueBar = boxGeo(spec.cabinWidth * 0.34, 0.12, 0.22, spec.cabinWidth * 0.20, roofY, spec.cabinZ);
+    const blueBar = boxGeo(spec.cabinWidth * 0.34, 0.12, 0.22, spec.cabinWidth * 0.20, roofY, roofZFor(spec));
     applyColor(blueBar, new THREE.Color('#0077ff'));
     extraParts.push(blueBar);
 
     // Center takedown
-    const takedown = boxGeo(spec.cabinWidth * 0.10, 0.10, 0.20, 0, roofY, spec.cabinZ);
+    const takedown = boxGeo(spec.cabinWidth * 0.10, 0.10, 0.20, 0, roofY, roofZFor(spec));
     applyColor(takedown, new THREE.Color('#f0f4ff'));
     extraParts.push(takedown);
 
@@ -691,8 +761,8 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
     extraParts.push(bullBarL, bullBarR, padL, padR, crossBarLow, crossBarHigh, wingL, wingR);
 
     // Driver's side A-pillar spotlight (left-hand side in US)
-    const spotY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.28;
-    const spotZ = spec.cabinZ + spec.cabinLength * 0.34;
+    const spotY = roofTopFor(spec) - spec.cabinHeight * 0.45;
+    const spotZ = roofZFor(spec) + spec.cabinLength * 0.34;
     const spotArm = boxGeo(0.10, 0.03, 0.03, spec.cabinWidth * 0.49, spotY, spotZ);
     applyColor(spotArm, new THREE.Color('#16181c'));
     const spotHousing = boxGeo(0.11, 0.11, 0.13, spec.cabinWidth * 0.55, spotY, spotZ + 0.04);
@@ -714,27 +784,27 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
     extraParts.push(checkerR);
 
     // Illuminated roof TAXI medallion sign with black "TAXI" lettering bars and amber glow tint
-    const roofY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.12;
+    const roofY = roofTopFor(spec) + 0.07;
 
-    const taxiBase = boxGeo(spec.cabinWidth * 0.46, 0.03, 0.28, 0, roofY - 0.07, spec.cabinZ);
+    const taxiBase = boxGeo(spec.cabinWidth * 0.46, 0.03, 0.28, 0, roofY - 0.07, roofZFor(spec));
     applyColor(taxiBase, new THREE.Color('#181b20'));
 
-    const footL = boxGeo(0.04, 0.05, 0.22, spec.cabinWidth * 0.21, roofY - 0.07, spec.cabinZ);
+    const footL = boxGeo(0.04, 0.05, 0.22, spec.cabinWidth * 0.21, roofY - 0.07, roofZFor(spec));
     applyColor(footL, new THREE.Color('#111214'));
-    const footR = boxGeo(0.04, 0.05, 0.22, -spec.cabinWidth * 0.21, roofY - 0.07, spec.cabinZ);
+    const footR = boxGeo(0.04, 0.05, 0.22, -spec.cabinWidth * 0.21, roofY - 0.07, roofZFor(spec));
     applyColor(footR, new THREE.Color('#111214'));
 
-    const taxiBox = boxGeo(spec.cabinWidth * 0.42, 0.15, 0.24, 0, roofY, spec.cabinZ);
+    const taxiBox = boxGeo(spec.cabinWidth * 0.42, 0.15, 0.24, 0, roofY, roofZFor(spec));
     applyColor(taxiBox, new THREE.Color('#ffaa00'));
 
     // Black "TAXI" lettering bars on front and rear faces
-    const taxiBarFront = boxGeo(spec.cabinWidth * 0.32, 0.065, 0.02, 0, roofY, spec.cabinZ + 0.125);
+    const taxiBarFront = boxGeo(spec.cabinWidth * 0.32, 0.065, 0.02, 0, roofY, roofZFor(spec) + 0.125);
     applyColor(taxiBarFront, new THREE.Color('#111214'));
-    const taxiBarRear = boxGeo(spec.cabinWidth * 0.32, 0.065, 0.02, 0, roofY, spec.cabinZ - 0.125);
+    const taxiBarRear = boxGeo(spec.cabinWidth * 0.32, 0.065, 0.02, 0, roofY, roofZFor(spec) - 0.125);
     applyColor(taxiBarRear, new THREE.Color('#111214'));
 
     // Amber medallion crown flasher
-    const taxiBeacon = boxGeo(spec.cabinWidth * 0.14, 0.04, 0.12, 0, roofY + 0.09, spec.cabinZ);
+    const taxiBeacon = boxGeo(spec.cabinWidth * 0.14, 0.04, 0.12, 0, roofY + 0.09, roofZFor(spec));
     applyColor(taxiBeacon, new THREE.Color('#ff7700'));
 
     extraParts.push(taxiBase, footL, footR, taxiBox, taxiBarFront, taxiBarRear, taxiBeacon);

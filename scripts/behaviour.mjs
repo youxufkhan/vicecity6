@@ -305,6 +305,12 @@ check(spawn.popIns === 0, `no car appears on screen (${spawn.popIns})`);
 check(spawn.popOuts === 0, `no car vanishes on screen (${spawn.popOuts})`);
 check(spawn.overlaps === 0, `no two traffic cars overlap (${spawn.overlaps} frames)`);
 
+console.log('\n── SolidCraft car models ──');
+const models = await page.evaluate(() => window.__game.debugCarModels());
+check(models.built === 24, `all 6 car types build in all 4 liveries (${models.built}/24)`);
+check(models.failures.length === 0, `no model build failures ${models.failures.join('; ')}`);
+check(models.maxTriangles < 7000, `heaviest car stays under 7000 triangles (${models.maxTriangles})`);
+
 console.log('\n── traffic signal cycles vary by district density ──');
 const cycles = await page.evaluate(() => {
   const g = window.__game;

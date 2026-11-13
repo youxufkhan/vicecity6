@@ -10,7 +10,7 @@ import { Vehicle, resolveVehiclePairs } from './entities/Vehicle';
 import { TrafficManager, type TrafficAI } from './entities/Traffic';
 import { PedManager, type Pedestrian } from './entities/Pedestrian';
 import { FootCop, FootCopManager } from './entities/FootCop';
-import { CAR_SPECS, CIVIL_PAINT, headlightMaterial, tailMaterial } from './entities/CarFactory';
+import { CAR_SPECS, CIVIL_PAINT, headlightMaterial, tailMaterial, type Livery } from './entities/CarFactory';
 import { CameraRig } from './systems/CameraRig';
 import { Effects } from './systems/Effects';
 import { Wanted } from './systems/Wanted';
@@ -732,7 +732,7 @@ export class Game {
           speed: Math.abs(this.player.vehicle.forwardSpeed),
         }
       : { position: this.player.position, heading: this.player.yaw, speed: 0 };
-    this.cameraRig.update(dt, cameraTarget, aiming ? 'aim' : driving ? 'vehicle' : 'foot', world);
+    if (!this.freeCamera) this.cameraRig.update(dt, cameraTarget, aiming ? 'aim' : driving ? 'vehicle' : 'foot', world);
 
     /* ── world ── */
     this.sky.update(dt, this.player.position);
@@ -907,9 +907,9 @@ export class Game {
   private onShot(weaponId: string): void {
     const heat = WEAPONS[weaponId as keyof typeof WEAPONS]?.heat ?? 0.3;
     this.wanted.add(heat);
-    // Muzzle flash at weapon aim origin.
-    this.effects.muzzleFlash(this.weaponAimOrigin.x, this.weaponAimOrigin.y, this.weaponAimOrigin.z);
-    this.cameraRig.addShake(0.08);
+    // (The muzzle flash is spawned by WeaponSystem.fire, aligned with the barrel.)
+    this.cameraRig.addShake(0.03 + (WEAPONS[weaponId as keyof typeof WEAPONS]?.recoil ?? 0) * 2.2);
+    if (weaponId === 'unarmed') return;
     // Gunfire scatters the crowd.
     for (const ped of this.peds.peds) {
       if (dist2D(ped.position.x, ped.position.z, this.player.position.x, this.player.position.z) < 26) {
@@ -1565,6 +1565,53 @@ export class Game {
       kickPitch: w.kick.pitch,
       fired: w.shotsFired - before,
     };
+  }
+
+  /** Visual tour: stop the rig and place the camera by hand. */
+  private freeCamera = false;
+  debugCameraPose(x: number, y: number, z: number, tx: number, ty: number, tz: number): void {
+    this.freeCamera = true;
+    this.cameraRig.camera.position.set(x, y, z);
+    this.cameraRig.camera.lookAt(tx, ty, tz);
+  }
+
+  /** Used by the visual tour: park a showcase car in front of the camera. */
+  debugShowcaseCar(specId: string, paint: string, livery: Livery, yaw: number): Vehicle {
+    const f = this.cameraRig.forward;
+    const car = new Vehicle(CAR_SPECS[specId], paint, livery);
+    car.position.set(this.player.position.x + f.x * 6, 0, this.player.position.z + f.z * 6);
+    car.yaw = yaw;
+    car.group.userData.kind = 'vehicle';
+    car.group.position.set(car.position.x, 0, car.position.z);
+    car.group.rotation.y = yaw;
+    this.scene.add(car.group);
+    return car;
+  }
+
+  /** Used by tests: every car type builds in every livery from its SolidCraft model. */
+  debugCarModels(): { built: number; failures: string[]; maxTriangles: number } {
+    const failures: string[] = [];
+    let built = 0;
+    let maxTriangles = 0;
+    for (const spec of Object.values(CAR_SPECS)) {
+      for (const livery of ['civil', 'police', 'taxi', 'sport'] as Livery[]) {
+        try {
+          const car = new Vehicle(spec, '#3366cc', livery);
+          let tris = 0;
+          car.group.traverse((o) => {
+            const m = o as THREE.Mesh;
+            if (m.geometry) tris += (m.geometry.index ? m.geometry.index.count : m.geometry.getAttribute('position').count) / 3;
+          });
+          maxTriangles = Math.max(maxTriangles, tris);
+          if (car.visual.wheels.length !== 4) failures.push(`${spec.id}/${livery}: ${car.visual.wheels.length} wheels`);
+          car.dispose();
+          built++;
+        } catch (e) {
+          failures.push(`${spec.id}/${livery}: ${(e as Error).message}`);
+        }
+      }
+    }
+    return { built, failures, maxTriangles: Math.round(maxTriangles) };
   }
 
   /** Used by tests to inspect signal cycles. */

@@ -116,13 +116,33 @@ shoulder. The solution is a two-step ray:
    plane (`y = 1.25`). That is the **aim point**.
 2. Fire from the player's muzzle (`y = 1.32`) towards the aim point.
 
-If the camera looks level, the ray never crosses the chest plane, so a far
-point 250 m out is used instead — the muzzle-to-target line then still passes
-through the target's chest height.
+The aim point is found by casting the camera ray (started at the player, so the
+camera boom cannot block it) through the real hitscan: whatever is under the
+crosshair becomes the target, so parallax does not make shots miss. If nothing
+is hit, a far point 250 m out is used.
 
-The hitscan itself checks, in order of increasing cost: building boxes (ray),
-pedestrians (vertical cylinders, radius 0.55 m, height 1.9 m) and vehicles
-(circles at the vehicle's width).
+The hitscan itself checks: building boxes (ray), pedestrians and officers
+(vertical cylinders, radius 0.55 m, height 1.9 m), vehicles (the car's oriented
+box, slab test in the car's frame, so a bullet stops at the bodywork instead of
+the centre) and the ground plane. The height of the hit selects the damage zone
+(head above 1.5 m, legs below 0.75 m).
+
+## Front-wheel steering
+
+Wheels are rotated in `YXZ` order: spin about the axle first, then steer about
+the vertical axis. (Three's default `XYZ` order tilts a steered wheel.) Positive
+steer = turn right = yaw decreases, so the wheel's Y angle is the negative of the
+steer angle. The steering lock shrinks with speed (0.62 rad parked, 0.24 rad at
+top speed) and the inner wheel turns further than the outer one (Ackermann).
+
+## Traffic spawning
+
+Cars spawn 70–200 m from the player on a road, never inside the padded camera
+view, never within 9 m of another vehicle. Cars are only recycled once farther
+than 220 m *and* off-screen (or beyond 320 m). Together these remove the
+"car appears from nowhere / blinks" glitch: popping in on screen and two
+overlapping bodies z-fighting. `TrafficManager.popIns/popOuts` count violations
+and are asserted by `debugTrafficSpawn`.
 
 ## Day/night cycle
 

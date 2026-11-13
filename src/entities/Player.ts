@@ -2,166 +2,15 @@ import * as THREE from 'three';
 import type { CollisionWorld } from '../systems/Collision';
 import { clamp, clamp01, damp } from '../core/MathUtil';
 import type { Vehicle } from './Vehicle';
+import { softMesh, kindForSize, buildPistol, buildSmg, buildShotgun, type SoftKind } from '../core/Soft';
 
 const SKIN = '#c98d63';
 const SHIRT = '#1fb6a6';
 const JEANS = '#2b3b62';
 const SHOES = '#1b1d22';
 
-function limb(w: number, h: number, d: number, color: string): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.82, metalness: 0.03 }),
-  );
-  mesh.castShadow = true;
-  return mesh;
-}
-
-function gunMesh(
-  w: number,
-  h: number,
-  d: number,
-  color: string | number,
-  metalness = 0.1,
-  roughness = 0.8,
-): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({
-      color: new THREE.Color(color),
-      roughness,
-      metalness,
-    }),
-  );
-  mesh.castShadow = true;
-  return mesh;
-}
-
-function buildPistol(): THREE.Group {
-  const g = new THREE.Group();
-
-  // Slide: polished nickel / chrome silver (#e2e8f0, metalness: 0.92, roughness: 0.15)
-  // Dimensions increased ~25% (0.08 x 0.10 x 0.35) so it stands out distinctly
-  const slide = gunMesh(0.08, 0.10, 0.35, '#e2e8f0', 0.92, 0.15);
-  slide.position.set(0, 0.05, 0.08);
-  g.add(slide);
-
-  // Barrel bore: dark steel at front of slide
-  const barrel = gunMesh(0.055, 0.055, 0.06, '#1a1d24', 0.8, 0.25);
-  barrel.position.set(0, 0.05, 0.26);
-  g.add(barrel);
-
-  // Grip: rich mahogany wood (#5c2810)
-  const grip = gunMesh(0.065, 0.18, 0.11, '#5c2810', 0.05, 0.72);
-  grip.position.set(0, -0.07, -0.01);
-  grip.rotation.x = -0.22;
-  g.add(grip);
-
-  // Trigger guard: polished nickel
-  const guard = gunMesh(0.04, 0.07, 0.09, '#e2e8f0', 0.92, 0.15);
-  guard.position.set(0, -0.02, 0.06);
-  g.add(guard);
-
-  // Trigger: gold / brass (#d4af37, metalness: 0.8, roughness: 0.3)
-  const trigger = gunMesh(0.02, 0.045, 0.03, '#d4af37', 0.8, 0.3);
-  trigger.position.set(0, -0.02, 0.06);
-  g.add(trigger);
-
-  // Hammer: gold / brass (#d4af37, metalness: 0.8, roughness: 0.3)
-  const hammer = gunMesh(0.025, 0.04, 0.03, '#d4af37', 0.8, 0.3);
-  hammer.position.set(0, 0.08, -0.09);
-  g.add(hammer);
-
-  // Sights
-  const frontSight = gunMesh(0.02, 0.03, 0.035, '#ffffff', 0.1, 0.6);
-  frontSight.position.set(0, 0.11, 0.23);
-  g.add(frontSight);
-
-  const rearSight = gunMesh(0.035, 0.03, 0.03, '#1a1d24', 0.8, 0.3);
-  rearSight.position.set(0, 0.11, -0.08);
-  g.add(rearSight);
-
-  return g;
-}
-
-function buildSmg(): THREE.Group {
-  const g = new THREE.Group();
-
-  // Receiver: crisp dark parkerized finish (#1e2229, metalness: 0.65, roughness: 0.35)
-  const receiver = gunMesh(0.09, 0.13, 0.42, '#1e2229', 0.65, 0.35);
-  receiver.position.set(0, 0.05, 0.06);
-  g.add(receiver);
-
-  // Chrome barrel nut / shroud (#dcdde1, metalness: 0.92, roughness: 0.15)
-  const barrelNut = gunMesh(0.07, 0.07, 0.06, '#dcdde1', 0.92, 0.15);
-  barrelNut.position.set(0, 0.05, 0.275);
-  g.add(barrelNut);
-
-  // Barrel
-  const barrel = gunMesh(0.05, 0.05, 0.14, '#0f1216', 0.8, 0.25);
-  barrel.position.set(0, 0.05, 0.35);
-  g.add(barrel);
-
-  // Curved magazine (curved banana mag)
-  const magUpper = gunMesh(0.05, 0.14, 0.07, '#262a33', 0.5, 0.45);
-  magUpper.position.set(0, -0.08, 0.11);
-  magUpper.rotation.x = -0.12;
-  g.add(magUpper);
-
-  const magLower = gunMesh(0.048, 0.12, 0.065, '#262a33', 0.5, 0.45);
-  magLower.position.set(0, -0.18, 0.14);
-  magLower.rotation.x = -0.30;
-  g.add(magLower);
-
-  // Grip
-  const grip = gunMesh(0.065, 0.16, 0.10, '#181b22', 0.2, 0.75);
-  grip.position.set(0, -0.07, -0.01);
-  grip.rotation.x = -0.22;
-  g.add(grip);
-
-  // Stock
-  const stock = gunMesh(0.07, 0.09, 0.20, '#333a44', 0.7, 0.4);
-  stock.position.set(0, 0.04, -0.21);
-  g.add(stock);
-
-  return g;
-}
-
-function buildShotgun(): THREE.Group {
-  const g = new THREE.Group();
-
-  // Long blued steel barrel
-  const barrel = gunMesh(0.065, 0.065, 0.74, '#1b222c', 0.85, 0.22);
-  barrel.position.set(0, 0.06, 0.26);
-  g.add(barrel);
-
-  // Under-barrel magazine tube
-  const magTube = gunMesh(0.06, 0.06, 0.60, '#252b34', 0.8, 0.25);
-  magTube.position.set(0, 0.01, 0.20);
-  g.add(magTube);
-
-  // Steel heat shield over the rear half of the barrel
-  const heatShield = gunMesh(0.075, 0.075, 0.30, '#475569', 0.82, 0.3);
-  heatShield.position.set(0, 0.07, 0.18);
-  g.add(heatShield);
-
-  // Realistic warm walnut wood pump slide (#5c341b)
-  const pump = gunMesh(0.085, 0.09, 0.20, '#5c341b', 0.05, 0.65);
-  pump.position.set(0, 0.01, 0.26);
-  g.add(pump);
-
-  // Receiver: blued steel
-  const receiver = gunMesh(0.08, 0.12, 0.26, '#1b222c', 0.85, 0.22);
-  receiver.position.set(0, 0.04, -0.08);
-  g.add(receiver);
-
-  // Realistic warm walnut wood stock (#5c341b)
-  const stock = gunMesh(0.07, 0.15, 0.36, '#5c341b', 0.05, 0.65);
-  stock.position.set(0, -0.04, -0.36);
-  stock.rotation.x = 0.12;
-  g.add(stock);
-
-  return g;
+function limb(w: number, h: number, d: number, color: string, kind: SoftKind = kindForSize(w, h, d)): THREE.Mesh {
+  return softMesh(w, h, d, new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.82, metalness: 0.03 }), kind);
 }
 
 /** Third-person player character with a hand-animated walk cycle. */
@@ -234,7 +83,7 @@ export class Player {
     this.hips.add(this.torso);
 
     // Head
-    const head = limb(0.25, 0.27, 0.25, SKIN);
+    const head = limb(0.25, 0.27, 0.25, SKIN, 'round');
     head.position.y = 0.7;
     this.torso.add(head);
 
@@ -248,7 +97,7 @@ export class Player {
     this.torso.add(browBar);
 
     // Layered 80s hairstyle
-    const hair = limb(0.28, 0.12, 0.28, '#241c18');
+    const hair = limb(0.28, 0.12, 0.28, '#241c18', 'round');
     hair.position.set(0, 0.84, -0.01);
     this.torso.add(hair);
 

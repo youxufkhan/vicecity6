@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { softMesh, kindForSize, type SoftKind } from '../core/Soft';
 import type { CollisionWorld } from '../systems/Collision';
 import type { Vehicle } from './Vehicle';
 import { dist2D, rngFrom, type Rng } from '../core/MathUtil';
@@ -277,7 +278,7 @@ export class Pedestrian {
   dispose(): void {
     this.group.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.geometry && !mesh.userData.sharedGeometry) mesh.geometry.dispose();
       if (mesh.material) {
         const mat = mesh.material as THREE.Material;
         mat.dispose();
@@ -305,11 +306,8 @@ function buildRig(rng: Rng): PedRig {
   const beltMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#221c17'), roughness: 0.80 });
   const buckleMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#d4af37'), metalness: 0.75, roughness: 0.35 });
 
-  const box = (w: number, h: number, d: number, mat: THREE.Material): THREE.Mesh => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    mesh.castShadow = true;
-    return mesh;
-  };
+  const box = (w: number, h: number, d: number, mat: THREE.Material, kind: SoftKind = kindForSize(w, h, d)): THREE.Mesh =>
+    softMesh(w, h, d, mat, kind);
 
   if (isFemale) {
     // ── Female Torso ──
@@ -329,7 +327,7 @@ function buildRig(rng: Rng): PedRig {
     torso.add(waistband);
 
     // ── Head & Face ──
-    const head = box(0.21, 0.23, 0.21, skin);
+    const head = box(0.21, 0.23, 0.21, skin, 'round');
     head.position.y = 0.60;
     torso.add(head);
 
@@ -345,7 +343,7 @@ function buildRig(rng: Rng): PedRig {
 
     if (hairStyle === 0) {
       // Ponytail
-      const hairCrown = box(0.23, 0.10, 0.23, hairMat);
+      const hairCrown = box(0.23, 0.10, 0.23, hairMat, 'round');
       hairCrown.position.set(0, 0.71, -0.01);
       const hairTie = box(0.06, 0.04, 0.06, shirt);
       hairTie.position.set(0, 0.72, -0.13);
@@ -355,7 +353,7 @@ function buildRig(rng: Rng): PedRig {
       torso.add(hairCrown, hairTie, ponytail);
     } else if (hairStyle === 1) {
       // Sleek Bob cut
-      const hairCrown = box(0.24, 0.10, 0.24, hairMat);
+      const hairCrown = box(0.24, 0.10, 0.24, hairMat, 'round');
       hairCrown.position.set(0, 0.71, 0);
       const bobL = box(0.04, 0.22, 0.22, hairMat);
       bobL.position.set(0.11, 0.61, 0);
@@ -366,7 +364,7 @@ function buildRig(rng: Rng): PedRig {
       torso.add(hairCrown, bobL, bobR, bobBack);
     } else {
       // Long flowing waves
-      const hairCrown = box(0.24, 0.10, 0.24, hairMat);
+      const hairCrown = box(0.24, 0.10, 0.24, hairMat, 'round');
       hairCrown.position.set(0, 0.71, -0.01);
       const waveL = box(0.04, 0.34, 0.16, hairMat);
       waveL.position.set(0.11, 0.55, 0.03);
@@ -487,7 +485,7 @@ function buildRig(rng: Rng): PedRig {
   torso.add(buckle);
 
   // ── Head & Face ──
-  const head = box(0.22, 0.24, 0.22, skin);
+  const head = box(0.22, 0.24, 0.22, skin, 'round');
   head.position.y = 0.62;
   torso.add(head);
 
@@ -503,7 +501,7 @@ function buildRig(rng: Rng): PedRig {
 
   if (hairStyle === 0) {
     // Short crop with sideburns
-    const hairTop = box(0.24, 0.08, 0.24, hairMat);
+    const hairTop = box(0.24, 0.08, 0.24, hairMat, 'round');
     hairTop.position.set(0, 0.74, 0);
     const sideburnL = box(0.03, 0.10, 0.10, hairMat);
     sideburnL.position.set(0.11, 0.63, 0.02);
@@ -512,12 +510,12 @@ function buildRig(rng: Rng): PedRig {
     torso.add(hairTop, sideburnL, sideburnR);
   } else if (hairStyle === 1) {
     // 80s volume pompadour
-    const hairPomp = box(0.24, 0.14, 0.25, hairMat);
+    const hairPomp = box(0.24, 0.14, 0.25, hairMat, 'round');
     hairPomp.position.set(0, 0.77, -0.01);
     torso.add(hairPomp);
   } else if (hairStyle === 2) {
     // Afro / round curls
-    const afro = box(0.28, 0.16, 0.28, hairMat);
+    const afro = box(0.28, 0.16, 0.28, hairMat, 'round');
     afro.position.set(0, 0.75, 0);
     torso.add(afro);
   } else {

@@ -87,6 +87,8 @@ city should stay in the low hundreds.
 | New building shape or district | `world/City.ts` + `world/Layout.ts` |
 | New traffic behaviour | `entities/Traffic.ts` |
 | New physics behaviour | `entities/Vehicle.ts` |
+| New car model | `scripts/models/gen_cars.py` (recipe) → SolidCraft export → `scripts/models/build.sh` → `entities/CarFactory.ts` (`CAR_MODELS`) |
+| New character part | `core/Soft.ts` shapes (`softMesh`) used by `Player.ts`, `Pedestrian.ts`, `FootCop.ts` |
 | New mission | `systems/Missions.ts` |
 
 ## Debugging techniques used while building this
@@ -132,7 +134,21 @@ wrong somewhere else.
 ## Known limitations
 
 - There is no interior geometry — every building is a solid volume.
+- Car models are fixed-shape wedges (no damage deformation); wheels are one shared model scaled per car. Pedestrians still animate as rigid parts, not a skinned mesh.
 - The game is keyboard-and-mouse first; touch supports movement, camera, driving, and firing.
+
+## 3D models (SolidCraft)
+
+Vehicles, the wheel and the rounded character shapes are authored in SolidCraft
+through its MCP server. `scripts/models/gen_cars.py` writes one batch recipe per
+car (side profile → symmetric extrude → arches → fillets, plus glass, trim and
+light bodies named `Body`/`Glass`/`Trim*`/`Head*`/`Tail*`). Each is run through
+the SolidCraft `batch` tool and exported as `.glb` into `scripts/models/src/`.
+`scripts/models/build.sh` then decimates and compacts every export into
+`src/assets/models/*.json` (a few KB each; positions in mm, baked colours). Paint
+is applied at runtime to the `Body`/`Roof` group, so every car still gets random
+colours and liveries. `npm run`-free preview: `node scripts/carshot.mjs sedan coupe …`
+writes angle shots into `shots/`.
 
 ### Resolved limitations
 - **Visible 3D weapon models & player overhaul** — real-time 3D models for sidearms and long guns (pistol with two-tone slide, micro SMG with shroud, shotgun) attached to the character's right hand; overhauled player character with tropical open-collar button-up shirt, aviator sunglasses, gold watch, and retro sneakers.

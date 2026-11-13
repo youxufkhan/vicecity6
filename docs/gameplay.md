@@ -143,6 +143,15 @@ Four weapons, all hitscan:
 | Micro SMG | 17 | 780 | 70 m | 30 | yes |
 | Pump shotgun | 13 × 8 | 75 | 34 m | 6 | no |
 
+Shots are not perfectly accurate. Each shot lands inside a cone: the weapon's
+base spread, ×1.9 when fired from the hip, up to ×2.2 while running, plus a
+bloom that grows with sustained fire and decays between bursts. Every shot also
+kicks the camera upward (`WeaponSystem.kick`, drained into the camera each
+frame), so automatic fire has to be walked back down. Damage falls off beyond a
+third of the weapon's range (to 45 %), head shots do ×2.4 and leg shots ×0.8.
+The crosshair opens with the current spread and flashes yellow on a hit and red
+on a kill. Reload time is per weapon (pistol 1.3 s, SMG 1.9 s, shotgun 2.2 s).
+
 Aiming (`right mouse`) moves the camera to an over-the-shoulder position and
 points the player where the camera looks. Shooting uses the camera ray to pick
 an aim point on the chest plane, then fires from the player's muzzle towards

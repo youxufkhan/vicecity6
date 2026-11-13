@@ -1,18 +1,14 @@
 import * as THREE from 'three';
 import type { CollisionWorld } from '../systems/Collision';
+import { softMesh, kindForSize, type SoftKind } from '../core/Soft';
 import { angleDelta, clamp, dist2D, damp, rngFrom } from '../core/MathUtil';
 
 const UNIFORM = '#1d2b4a';
 const UNIFORM_DARK = '#141d33';
 const SKIN = '#c98d63';
 
-function box(w: number, h: number, d: number, color: string): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.8 }),
-  );
-  mesh.castShadow = true;
-  return mesh;
+function box(w: number, h: number, d: number, color: string, kind: SoftKind = kindForSize(w, h, d)): THREE.Mesh {
+  return softMesh(w, h, d, new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.8 }), kind);
 }
 
 /**
@@ -84,7 +80,7 @@ export class FootCop {
     hips.add(pouch);
 
     // Head
-    const head = box(0.25, 0.26, 0.25, SKIN);
+    const head = box(0.25, 0.26, 0.25, SKIN, 'round');
     head.position.y = 1.6;
     hips.add(head);
 
@@ -98,7 +94,7 @@ export class FootCop {
     hips.add(glassBar);
 
     // Police Cap with peak and crest
-    const cap = box(0.29, 0.11, 0.29, '#0d1526');
+    const cap = box(0.29, 0.11, 0.29, '#0d1526', 'round');
     cap.position.y = 1.74;
     hips.add(cap);
 
@@ -251,7 +247,7 @@ export class FootCop {
   dispose(): void {
     this.group.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.geometry && !mesh.userData.sharedGeometry) mesh.geometry.dispose();
       if (mesh.material) (mesh.material as THREE.Material).dispose();
     });
   }
