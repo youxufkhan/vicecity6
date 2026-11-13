@@ -11,7 +11,7 @@ import type { CollisionWorld } from './systems/Collision';
 import { TrafficManager, type TrafficAI } from './entities/Traffic';
 import { PedManager, type Pedestrian } from './entities/Pedestrian';
 import { FootCop, FootCopManager } from './entities/FootCop';
-import { CAR_SPECS, CIVIL_PAINT, headlightMaterial, tailMaterial, bodyMaterial, glassMaterial, wheelMaterial, type Livery } from './entities/CarFactory';
+import { CAR_SPECS, CIVIL_PAINT, headlightMaterial, tailMaterial, bodyMaterial, glassMaterial, wheelMaterial, headlightPoolMaterial, type Livery } from './entities/CarFactory';
 import { CameraRig } from './systems/CameraRig';
 import { Effects } from './systems/Effects';
 import { Wanted } from './systems/Wanted';
@@ -762,6 +762,7 @@ export class Game {
     headlightMaterial.emissiveIntensity = 0.12 + night * 1.9;
     tailMaterial.emissiveIntensity = 0.3 + night * 0.5;
     this.updateBeams(night);
+    this.applyNightLook(night);
 
     /* ── audio ── */
     this.updateAudio(dt);
@@ -1194,6 +1195,15 @@ export class Game {
     }
   }
 
+  /** Night-driven material tweaks: car light pools and wet-looking roads. */
+  private applyNightLook(night: number): void {
+    headlightPoolMaterial.opacity = night * 0.55;
+    for (const mat of this.city.roadMaterials) {
+      mat.roughness = 0.88 - night * 0.46;
+      mat.envMapIntensity = night * 0.8;
+    }
+  }
+
   /** Headlight beams on the player's car, brighter the darker it is. */
   private updateBeams(night: number, car: Vehicle | null = this.player.vehicle): void {
     const on = car !== null && !car.wrecked && night > 0.15;
@@ -1305,7 +1315,7 @@ export class Game {
   /* ─────────────────── render ─────────────────── */
 
   private render(): void {
-    this.sky.updateEnvironment(this.renderer, [bodyMaterial, glassMaterial, wheelMaterial]);
+    this.sky.updateEnvironment(this.renderer, [bodyMaterial, glassMaterial, wheelMaterial, ...this.city.roadMaterials]);
     this.renderer.render(this.scene, this.cameraRig.camera);
   }
 
@@ -1701,7 +1711,17 @@ export class Game {
     const lowGear = car.gear;
     car.velocity.set(0, 0, CAR_SPECS.sedan.topSpeed * 0.95);
     car.update(1 / 60, open);
-    const out = { ...result, lowGear, highGear: car.gear, rpm: car.rpm };
+    // Dented normals must differ from the rest pose; an undamaged car keeps the model's normals.
+    const fresh = new Vehicle(CAR_SPECS.sedan, '#3366cc');
+    const nn = (v: Vehicle): number => {
+      const n = v.visual.bodyMesh.geometry.getAttribute('normal');
+      let s = 0;
+      for (let i = 0; i < n.count; i++) s += n.getZ(i);
+      return s;
+    };
+    const normalShift = Math.abs(nn(car) - nn(fresh));
+    fresh.dispose();
+    const out = { ...result, lowGear, highGear: car.gear, rpm: car.rpm, normalShift };
     car.dispose();
     return out;
   }
@@ -1716,7 +1736,19 @@ export class Game {
     this.updateBeams(this.sky.night, car);
     const beamDay = this.beams[0].intensity;
     this.render();
-    return { envBaked: bodyMaterial.envMap !== null && glassMaterial.envMap !== null, beamNight, beamDay };
+    // The pool/road values are written by step(); run one to apply each time of day.
+    this.sky.setClockFraction(0.02);
+    this.applyNightLook(this.sky.night);
+    const poolNight = headlightPoolMaterial.opacity;
+    const roadRoughNight = this.city.roadMaterials[0].roughness;
+    this.sky.setClockFraction(0.5);
+    this.applyNightLook(this.sky.night);
+    const poolDay = headlightPoolMaterial.opacity;
+    const roadRoughDay = this.city.roadMaterials[0].roughness;
+    return {
+      envBaked: bodyMaterial.envMap !== null && glassMaterial.envMap !== null && this.city.roadMaterials[0].envMap !== null,
+      beamNight, beamDay, poolNight, poolDay, roadRoughNight, roadRoughDay,
+    };
   }
 
   /** Used by tests to inspect signal cycles. */

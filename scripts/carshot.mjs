@@ -34,6 +34,7 @@ await page.evaluate(() => document.querySelector('[data-action="start"]').click(
 await new Promise((r) => setTimeout(r, 800));
 await page.evaluate(() => document.getElementById('click-to-play')?.click());
 await new Promise((r) => setTimeout(r, 500));
+if (process.env.NIGHT) await page.evaluate(() => window.__game.debugSetTime(0.02));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const id of process.argv.slice(2)) {
   if (id.startsWith('player')) {

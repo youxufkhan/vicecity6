@@ -317,6 +317,7 @@ check(drv.hardSlide > drv.gentleSlide * 2 && drv.hardSlide > 1.5, `a hard turn a
 check(drv.handbrakeYaw > drv.noHandbrakeYaw * 1.2, `handbrake swings the tail round (${drv.handbrakeYaw.toFixed(2)} vs ${drv.noHandbrakeYaw.toFixed(2)} rad)`);
 check(drv.lowGear < drv.highGear && drv.highGear === 5, `gears climb with speed (${drv.lowGear} -> ${drv.highGear})`);
 check(drv.dentFront > 0 && drv.dentRear === 0, 'a nose hit dents only the front');
+check(drv.normalShift > 0.01, `dented panels get fresh normals (${drv.normalShift.toFixed(2)})`);
 check(drv.noseMoved > 0.05, `the nose geometry is pushed in (${drv.noseMoved.toFixed(2)} m)`);
 
 console.log('\n── traffic signal cycles vary by district density ──');
@@ -329,6 +330,8 @@ check(cycles.downtown > cycles.outer, `downtown cycle (${cycles.downtown}s) long
 console.log('\n── look: reflections and headlight beams ──');
 const look = await page.evaluate(() => window.__game.debugLook());
 check(look.envBaked, 'car paint and glass have a baked sky reflection');
+check(look.poolNight > 0.3 && look.poolDay === 0, `AI headlight pools glow at night only (${look.poolNight.toFixed(2)} / ${look.poolDay})`);
+check(look.roadRoughNight < look.roadRoughDay - 0.2, `roads get wetter at night (${look.roadRoughNight.toFixed(2)} < ${look.roadRoughDay.toFixed(2)})`);
 check(look.beamNight > 20 && look.beamDay === 0, `headlight beams on at night (${look.beamNight.toFixed(0)}), off by day`);
 
 console.log('\n── touch play ──');

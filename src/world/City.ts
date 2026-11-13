@@ -42,6 +42,8 @@ export interface City {
   carSpawns: CitySpawn[];
   pedSpawns: CitySpawn[];
   facadeMaterials: THREE.MeshStandardMaterial[];
+  /** Road and intersection materials: Game wets them at night. */
+  roadMaterials: THREE.MeshStandardMaterial[];
   neonMaterials: THREE.MeshStandardMaterial[];
   water: THREE.Mesh;
   waterTexture: THREE.Texture;
@@ -722,6 +724,7 @@ export function buildCity(seed = 20261113): City {
     carSpawns,
     pedSpawns,
     facadeMaterials,
+    roadMaterials: [roadMat, asphaltMat],
     neonMaterials,
     water,
     waterTexture: wTex,

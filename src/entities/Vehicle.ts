@@ -274,6 +274,8 @@ export class Vehicle {
     }
     pos.needsUpdate = true;
     if (col) col.needsUpdate = true;
+    // Crumpled panels are faceted: recompute normals so the dents catch the light.
+    geo.computeVertexNormals();
   }
 
   private updateVisual(dt: number, forwardSpeed: number): void {
@@ -327,7 +329,7 @@ export class Vehicle {
   dispose(): void {
     this.visual.group.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.geometry && !mesh.userData.sharedGeometry) mesh.geometry.dispose();
     });
   }
 }

@@ -149,7 +149,12 @@ the centre) and the ground plane. The height of the hit selects the damage zone
 `Sky.updateEnvironment` renders the sky dome into a PMREM cube every 1/20 of a day and
 assigns it only to the car paint, glass and wheel materials (`envMap`), so buildings
 and roads keep their tuned look. At night the player's car has two spot lights
-(`Game.updateBeams`); other cars rely on emissive headlights.
+(`Game.updateBeams`). Every other car throws a flat additive light pool on the road
+(`headlightPoolMaterial`, one shared quad geometry and material whose opacity follows
+night), so traffic reads as lit without extra lights. At night the road materials lose
+roughness (0.88 → 0.42) and pick up a little sky/neon reflection so the streets look wet.
+Traffic already brakes for the player's car: `TrafficAI.vehicleAhead` scans the shared
+context, which includes it.
 
 ## Front-wheel steering
 

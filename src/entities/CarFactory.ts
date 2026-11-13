@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { applyColor } from '../world/GeoUtil';
+import { radialSprite } from '../core/Textures';
 import sedanModel from '../assets/models/sedan.json';
 import coupeModel from '../assets/models/coupe.json';
 import suvModel from '../assets/models/suv.json';
@@ -253,6 +254,20 @@ export const wheelMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.5,
   envMapIntensity: 0.9,
 });
+
+/**
+ * Light pool a car's headlights throw on the road: one shared additive quad geometry and ONE
+ * shared material (opacity driven by the night factor in Game), so it costs no lights or shaders.
+ */
+export const headlightPoolMaterial = new THREE.MeshBasicMaterial({
+  map: radialSprite('rgba(255,243,210,1)', 'rgba(255,243,210,0)'),
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  fog: false,
+});
+const poolGeometry = new THREE.PlaneGeometry(4.4, 8).rotateX(-Math.PI / 2);
 
 function boxGeo(w: number, h: number, d: number, x: number, y: number, z: number): THREE.BufferGeometry {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -859,6 +874,12 @@ export function createCarVisual(spec: CarSpec, paint: string, livery: Livery = '
     group.add(wheel);
     wheels.push(wheel);
   }
+
+  const pool = new THREE.Mesh(poolGeometry, headlightPoolMaterial);
+  pool.position.set(0, 0.05, spec.length / 2 + 3.6);
+  pool.renderOrder = 2;
+  pool.userData.sharedGeometry = true; // shared across every car: Vehicle.dispose must not free it
+  group.add(pool);
 
   // Body shadow blob keeps the car grounded even with shadows disabled.
   const blob = new THREE.Mesh(
