@@ -79,6 +79,73 @@ const inputSteps = await page.evaluate(() => {
 check(inputSteps.afterShortFrame === inputSteps.before, 'a render without a simulation step leaves the weapon alone');
 check(inputSteps.afterCatchUp !== inputSteps.before, 'the next simulation step consumes a queued key press exactly once');
 
+console.log('\n── cover, pause and calm pedestrians ──');
+const fairness = await page.evaluate(() => {
+  const g = window.__game;
+  const World = g.city.collision.constructor;
+  const wall = new World([{ minX: -20, maxX: 20, minZ: -0.3, maxZ: 0.3, height: 8 }]);
+  const cop = g.footCops.spawn(0, -4);
+  const target = g.player.position.clone().set(0, 0, 4);
+  let throughWallDamage = 0;
+  for (let i = 0; i < 600; i++) throughWallDamage += cop.update(1 / 60, wall, target, g.effects);
+  g.footCops.clear();
+  const car = g.traffic.traffic[0];
+  car.velocity.set(8, 0, 0);
+  const position = car.position.clone();
+  const time = g.elapsed;
+  g.pauseGame();
+  g.simulate(2);
+  const pausedDistance = car.position.distanceTo(position);
+  const pausedTime = g.elapsed - time;
+  g.resumeGame();
+  const ped = g.peds.spawnAt(20, 30);
+  g.peds.update(1 / 60, new World(), 20, 31, []);
+  const calm = ped.state !== 'flee';
+  ped.kill();
+  const embedded = wall.resolveCircle(0, 0, 0.42);
+  const thin = new World([{ minX: -1, maxX: 1, minZ: 0.11, maxZ: 0.15, height: 8 }]);
+  return { throughWallDamage, pausedDistance, pausedTime, calm,
+    thinWall: thin.raycast(0, -4, 0, 4).hit,
+    entrances: g.debugStreetDetail().entrances,
+    escapedWall: !wall.overlaps(embedded.px, embedded.pz, 0.419) };
+});
+check(fairness.throughWallDamage === 0, 'solid cover blocks officer damage');
+check(fairness.pausedDistance === 0 && fairness.pausedTime === 0, 'pause freezes vehicles and simulation time');
+check(fairness.calm, 'a nearby peaceful player does not cause panic');
+check(fairness.thinWall, 'thin walls block line of sight');
+check(fairness.entrances > 30, 'building entrances are present in the scene');
+check(fairness.escapedWall, 'collision resolution pushes an embedded circle out of a wall');
+
+console.log('\n── vehicle body collisions ──');
+const bodies = await page.evaluate(() => {
+  const g = window.__game;
+  const sample = g.traffic.traffic[0];
+  const a = new sample.constructor(sample.spec, '#ffffff');
+  const b = new sample.constructor(sample.spec, '#ffffff');
+  a.position.set(0, 0, 82);
+  b.position.set(a.spec.width + 0.2, 0, 82);
+  const traffic = g.traffic.traffic.splice(0);
+  const police = g.traffic.police.splice(0);
+  g.traffic.traffic.push(a, b);
+  const clearDistance = a.position.distanceTo(b.position);
+  g.updateIdle(1 / 60);
+  const noPhantomContact = Math.abs(a.position.distanceTo(b.position) - clearDistance) < 1e-6;
+  b.position.copy(a.position);
+  g.updateIdle(1 / 60);
+  const separated = a.position.distanceTo(b.position) > a.spec.width * 0.9;
+  a.position.set(0, 0, 82);
+  a.yaw = Math.PI / 2;
+  const nearMiss = !a.overlapsCircle(0, 82 + a.spec.width / 2 + 0.5, 0.35);
+  const frontHit = a.overlapsCircle(a.spec.length / 2 + 0.1, 82, 0.35);
+  g.traffic.traffic.splice(0, 2, ...traffic);
+  g.traffic.police.push(...police);
+  a.dispose(); b.dispose();
+  return { noPhantomContact, separated, nearMiss, frontHit };
+});
+check(bodies.noPhantomContact, 'side-by-side cars with visible clearance do not collide');
+check(bodies.separated, 'coincident cars separate without invalid coordinates');
+check(bodies.nearMiss && bodies.frontHit, 'pedestrian hitboxes follow the rotated vehicle body');
+
 console.log('\n── traffic keeps to the road ──');
 const traffic = await page.evaluate(() => {
   const g = window.__game;

@@ -133,7 +133,14 @@ export class CollisionWorld {
           const m = Math.min(toLeft, toRight, toBack, toFront);
           dx = m === toLeft ? -1 : m === toRight ? 1 : 0;
           dz = m === toBack ? -1 : m === toFront ? 1 : 0;
-          d = 1;
+          const push = radius + m;
+          px += dx * push;
+          pz += dz * push;
+          nx += dx;
+          nz += dz;
+          depth = Math.max(depth, push);
+          moved = true;
+          continue;
         }
         const inv = 1 / d;
         const push = radius - d;
@@ -164,65 +171,51 @@ export class CollisionWorld {
     return false;
   }
 
-  /**
-   * March a horizontal segment and report the first solid box hit.
-   * `minHeight` ignores obstacles that are lower than the projectile.
-   */
+  /** Intersect a segment with collider slabs so even thin walls block sight. */
   raycast(x0: number, z0: number, x1: number, z1: number, minHeight = 0): RayHit {
     const dx = x1 - x0;
     const dz = z1 - z0;
-    const dist = Math.hypot(dx, dz);
-    if (dist < 1e-4) return EMPTY_RAY;
-    const steps = Math.max(2, Math.ceil(dist / 1.4));
-    const step = 1 / steps;
-
-    for (let s = 1; s <= steps; s++) {
-      const t = s * step;
-      const px = x0 + dx * t;
-      const pz = z0 + dz * t;
-      const ids = this.query(px - 0.3, pz - 0.3, px + 0.3, pz + 0.3);
-      for (const i of ids) {
-        const b = this.boxes[i];
-        if (b.height < minHeight) continue;
-        if (px > b.minX && px < b.maxX && pz > b.minZ && pz < b.maxZ) {
-          // Determine which face was crossed.
-          const fx = (px - b.minX) / Math.max(1e-5, b.maxX - b.minX);
-          const fz = (pz - b.minZ) / Math.max(1e-5, b.maxZ - b.minZ);
-          let nx = 0;
-          let nz = 0;
-          if (fx <= fz && fx <= 1 - fz) nx = -1;
-          else if (fx >= 1 - fz) nx = 1;
-          else if (fz <= 1 - fx) nz = -1;
-          else nz = 1;
-          return { hit: true, t, x: px, z: pz, nx, nz, height: b.height };
+    let result = EMPTY_RAY;
+    let nearest = Infinity;
+    const ids = this.query(Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1));
+    for (const id of ids) {
+      const box = this.boxes[id];
+      if (box.height < minHeight) continue;
+      let enter = 0;
+      let leave = 1;
+      let nx = 0;
+      let nz = 0;
+      for (const axis of [0, 1]) {
+        const origin = axis === 0 ? x0 : z0;
+        const delta = axis === 0 ? dx : dz;
+        const min = axis === 0 ? box.minX : box.minZ;
+        const max = axis === 0 ? box.maxX : box.maxZ;
+        if (Math.abs(delta) < 1e-10) {
+          if (origin < min || origin > max) leave = -1;
+          continue;
         }
+        const t0 = (min - origin) / delta;
+        const t1 = (max - origin) / delta;
+        const near = Math.min(t0, t1);
+        if (near > enter) {
+          enter = near;
+          nx = axis === 0 ? -Math.sign(delta) : 0;
+          nz = axis === 1 ? -Math.sign(delta) : 0;
+        }
+        leave = Math.min(leave, Math.max(t0, t1));
       }
+      if (enter > leave || enter >= nearest) continue;
+      nearest = enter;
+      result = { hit: true, t: enter, x: x0 + dx * enter, z: z0 + dz * enter, nx, nz, height: box.height };
     }
-    return EMPTY_RAY;
+    return result;
   }
 
-  /** Distance along a segment before it hits a solid box (for camera pull-in). */
+  /** Distance to the first obstacle, shared with gameplay line-of-sight queries. */
   rayDistance(x0: number, z0: number, x1: number, z1: number): number {
-    const dx = x1 - x0;
-    const dz = z1 - z0;
-    const dist = Math.hypot(dx, dz);
-    if (dist < 1e-4) return dist;
-    const steps = Math.max(2, Math.ceil(dist / 1.2));
-    const step = 1 / steps;
-    for (let s = 1; s <= steps; s++) {
-      const t = s * step;
-      const px = x0 + dx * t;
-      const pz = z0 + dz * t;
-      const ids = this.query(px - 0.25, pz - 0.25, px + 0.25, pz + 0.25);
-      for (const i of ids) {
-        const b = this.boxes[i];
-        if (px > b.minX && px < b.maxX && pz > b.minZ && pz < b.maxZ) {
-          return Math.max(0, dist * (t - step));
-        }
-      }
-    }
-    return dist;
+    return Math.hypot(x1 - x0, z1 - z0) * this.raycast(x0, z0, x1, z1).t;
   }
+
 }
 
 /** Shared scratch vector to avoid allocations in hot paths. */

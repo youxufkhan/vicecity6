@@ -532,6 +532,7 @@ export class Game {
   }
 
   private update(dt: number): void {
+    if (this.state === 'paused' || (this.state === 'playing' && this.hud.mapOpen && !this.input.pressed('KeyM'))) return;
     this.elapsed += dt;
 
     switch (this.state) {
@@ -541,7 +542,6 @@ export class Game {
       case 'playing':
         this.updatePlaying(dt);
         break;
-      case 'paused':
       case 'wasted':
       case 'clear':
         this.updateIdle(dt);
@@ -968,11 +968,9 @@ export class Game {
   private handlePedCollisions(vehicles: Vehicle[]): void {
     for (const car of vehicles) {
       if (Math.abs(car.forwardSpeed) < 3) continue;
-      const radius = car.spec.length * 0.5;
       for (const ped of this.peds.peds) {
         if (ped.state === 'dead' || ped.state === 'stunned') continue;
-        const d = dist2D(ped.position.x, ped.position.z, car.position.x, car.position.z);
-        if (d > radius + 0.5) continue;
+        if (!car.overlapsCircle(ped.position.x, ped.position.z, 0.35)) continue;
         const killed = ped.damage(120);
         ped.stun();
         this.effects.blood(ped.position.x, 1, ped.position.z);
@@ -984,8 +982,7 @@ export class Game {
       }
       for (const cop of this.footCops.cops) {
         if (!cop.alive) continue;
-        const d = dist2D(cop.position.x, cop.position.z, car.position.x, car.position.z);
-        if (d > radius + 0.5) continue;
+        if (!car.overlapsCircle(cop.position.x, cop.position.z, 0.45)) continue;
         const killed = cop.damage(120);
         this.effects.blood(cop.position.x, 1, cop.position.z);
         if (car.driver === 'player') {
@@ -1035,6 +1032,11 @@ export class Game {
         break;
       }
     }
+    if (!spotted) {
+      spotted = this.footCops.cops.some((cop) => cop.alive &&
+        cop.distanceToPlayer(this.player.position.x, this.player.position.z) < 45 &&
+        !this.city.collision.raycast(cop.position.x, cop.position.z, this.player.position.x, this.player.position.z, 1.2).hit);
+    }
     this.wanted.spotted = spotted;
     this.wanted.update(dt);
 
@@ -1045,7 +1047,7 @@ export class Game {
     }
     // Officers on foot: two from two stars, more as the heat climbs.
     const footCount = wantedCount >= 2 ? Math.min(4, wantedCount - 1) : 0;
-    this.footCops.maintain(footCount, this.player.position.x, this.player.position.z);
+    this.footCops.maintain(footCount, this.player.position.x, this.player.position.z, this.city.collision);
     if (footCount > 0) {
       for (const cop of this.footCops.cops) {
         const damage = cop.update(dt, this.city.collision, this.player.position, this.effects);
@@ -1065,7 +1067,8 @@ export class Game {
     // Busted: an officer right next to a pedestrian player.
     if (!this.player.vehicle && this.wanted.level > 0 && this.wanted.graceTimer <= 0) {
       for (const cop of this.footCops.cops) {
-        if (cop.alive && cop.distanceToPlayer(this.player.position.x, this.player.position.z) < 2.6) {
+        if (cop.alive && cop.distanceToPlayer(this.player.position.x, this.player.position.z) < 2.6 &&
+            !this.city.collision.raycast(cop.position.x, cop.position.z, this.player.position.x, this.player.position.z).hit) {
           this.onPlayerDead('The cops got you');
           return;
         }
@@ -1293,6 +1296,12 @@ export class Game {
       triangles: this.renderer.info.render.triangles,
       fps: 0,
     };
+  }
+
+  debugStreetDetail(): { entrances: number } {
+    let entrances = 0;
+    this.city.group.traverse((object) => { entrances += Number(object.userData.entrances ?? 0); });
+    return { entrances };
   }
 
   /** Used by the smoke test to hop into the closest car. */

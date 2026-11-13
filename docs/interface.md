@@ -62,7 +62,7 @@ world.
 
 `M` toggles a full-screen map of the whole city: the road grid, the blocks, the
 beach and the ocean, plus the same blips as the radar and a player arrow. The
-action freezes while it is open, and releasing the pointer lock with `Esc`
+action and simulation clock freeze while it is open, and releasing the pointer lock with `Esc`
 closes the map instead of opening the pause menu.
 
 ## Menus

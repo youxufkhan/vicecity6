@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { CollisionWorld } from '../systems/Collision';
-import { angleDelta, clamp, dist2D, damp } from '../core/MathUtil';
+import { angleDelta, clamp, dist2D, damp, rngFrom } from '../core/MathUtil';
 
 const UNIFORM = '#1d2b4a';
 const UNIFORM_DARK = '#141d33';
@@ -33,8 +33,10 @@ export class FootCop {
   private armR = new THREE.Group();
   private phase = 0;
   private aim = 0;
+  private rng;
 
   constructor(x: number, z: number) {
+    this.rng = rngFrom(Math.round(x * 7919 + z * 104729));
     this.position.set(x, 0, z);
     this.group.position.set(x, 0, z);
 
@@ -204,16 +206,21 @@ export class FootCop {
       this.position.z -= Math.sin(this.yaw * 1.7) * dt * 1.4;
     }
 
+    const separation = world.resolveCircle(this.position.x, this.position.z, 0.45);
+    this.position.x += separation.px;
+    this.position.z += separation.pz;
+    const visible = !world.raycast(this.position.x, this.position.z, playerPos.x, playerPos.z, 1.2).hit;
+
     // Aiming and firing.
-    this.aim = damp(this.aim, dist < 26 ? 1 : 0, 6, dt);
+    this.aim = damp(this.aim, dist < 26 && visible ? 1 : 0, 6, dt);
     this.fireTimer -= dt;
     let damage = 0;
-    if (this.fireTimer <= 0 && dist < 26 && this.aim > 0.5) {
-      this.fireTimer = 1.1 + Math.random() * 0.8;
+    if (this.fireTimer <= 0 && dist < 26 && visible && this.aim > 0.5) {
+      this.fireTimer = 1.1 + this.rng() * 0.8;
       const muzzleY = 1.35;
-      const hit = Math.random() < clamp(0.55 - dist * 0.012, 0.12, 0.5);
-      const endX = hit ? playerPos.x : playerPos.x + (Math.random() - 0.5) * 6;
-      const endZ = hit ? playerPos.z : playerPos.z + (Math.random() - 0.5) * 6;
+      const hit = this.rng() < clamp(0.55 - dist * 0.012, 0.12, 0.5);
+      const endX = hit ? playerPos.x : playerPos.x + (this.rng() - 0.5) * 6;
+      const endZ = hit ? playerPos.z : playerPos.z + (this.rng() - 0.5) * 6;
       effects.tracer(
         this.position.x + Math.sin(this.yaw) * 0.5,
         muzzleY,
@@ -222,7 +229,7 @@ export class FootCop {
         1.2,
         endZ,
       );
-      if (hit) damage = 5 + Math.random() * 5;
+      if (hit) damage = 5 + this.rng() * 5;
     }
 
     // Animation.
@@ -254,6 +261,7 @@ export class FootCop {
 export class FootCopManager {
   readonly cops: FootCop[] = [];
   private scene: THREE.Scene;
+  private rng = rngFrom(8128);
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -268,7 +276,7 @@ export class FootCopManager {
   }
 
   /** Keep the number of officers in line with the wanted level. */
-  maintain(count: number, playerX: number, playerZ: number): void {
+  maintain(count: number, playerX: number, playerZ: number, world: CollisionWorld): void {
     // Clean up dead officers that have lingered or cops that are too far away.
     for (let i = this.cops.length - 1; i >= 0; i--) {
       const cop = this.cops[i];
@@ -281,10 +289,13 @@ export class FootCopManager {
     }
 
     const liveCount = this.cops.filter((c) => c.alive).length;
-    while (liveCount < count && this.cops.length < count + 3) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 26 + Math.random() * 22;
-      this.spawn(playerX + Math.cos(angle) * dist, playerZ + Math.sin(angle) * dist);
+    for (let attempt = 0; liveCount < count && this.cops.length < count + 3 && attempt < 20; attempt++) {
+      const angle = this.rng() * Math.PI * 2;
+      const dist = 26 + this.rng() * 22;
+      const x = playerX + Math.cos(angle) * dist;
+      const z = playerZ + Math.sin(angle) * dist;
+      if (world.overlaps(x, z, 0.45)) continue;
+      this.spawn(x, z);
       break;
     }
     while (this.cops.length > count && this.cops.some((c) => !c.alive)) {

@@ -116,3 +116,9 @@ Worth running by hand after a change to the feel of the game:
 7. Get out of the car with officers around — they should close in on foot and
    bust you if they get close.
 8. Press `Esc` — the game should pause and release the pointer.
+
+The behaviour suite also checks sustained cover against officer fire, thin-wall
+ray intersections, frozen pause time and vehicles, calm pedestrians, embedded
+collision recovery, building entrance counts, car clearance, coincident car
+separation and rotated vehicle/pedestrian hitboxes. `debugStreetDetail()`
+reports the number of building entrances attached to the city scene.

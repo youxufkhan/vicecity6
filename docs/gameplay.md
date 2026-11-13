@@ -95,7 +95,6 @@ Civilians walk the **sidewalk loop of their block** — a rectangle inset by hal
 the pavement width — and walk around it in one direction until something
 distracts them. They flee (and leave the loop) when:
 
-- the player is within 14 m
 - a gun is fired within 26 m
 - the player's car or the horn comes close
 - any vehicle approaches dangerously close at speed (> 4.0 m/s within 3.8 m)
@@ -125,7 +124,9 @@ walk toward the player, stop at about 11 m, raise their sidearm and fire every
 1.1–1.9 s. Upgraded with tactical dark-navy body armor vests featuring reflective white "POLICE"
 patches front and back, gold badges, shoulder communication radios, full tactical utility duty belts,
 service peaked caps with gold crests, aviator sunglasses, heavy tactical combat boots, and detailed
-service sidearms. The hit chance falls with distance (50 % at point blank down to
+service sidearms. Buildings block officer shots and arrests. Officers spawn in clear positions,
+resolve wall collisions when strafing, and contribute to police visibility.
+The hit chance falls with distance (50 % at point blank down to
 about 24 % at 26 m). If an officer gets within 2.6 m of an on-foot player, the
 player is busted. They can be engaged in combat with weapons or run over with
 vehicles, and drop bounties when eliminated. There is a 3.5 s grace period
@@ -198,3 +199,6 @@ marker cylinder in the world.
   over it.
 - Health, armour and weapon pickups are scattered around the city.
 - Respawning after a WASTED costs up to $500.
+
+Vehicle contacts use oriented body rectangles. Pedestrian impacts use circle-to-body
+intersection, so passing beside a car with sufficient clearance is safe.

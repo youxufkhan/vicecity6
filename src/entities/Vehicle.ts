@@ -58,6 +58,16 @@ export class Vehicle {
     this.halfBase = spec.wheelBase * 0.42;
   }
 
+  overlapsCircle(x: number, z: number, radius: number): boolean {
+    const dx = x - this.position.x;
+    const dz = z - this.position.z;
+    const along = dx * Math.sin(this.yaw) + dz * Math.cos(this.yaw);
+    const across = -dx * Math.cos(this.yaw) + dz * Math.sin(this.yaw);
+    const outsideLength = Math.max(0, Math.abs(along) - this.spec.length / 2);
+    const outsideWidth = Math.max(0, Math.abs(across) - this.spec.width / 2);
+    return Math.hypot(outsideLength, outsideWidth) < radius;
+  }
+
   get speed(): number {
     return this.velocity.length();
   }
@@ -231,7 +241,7 @@ export interface VehicleAI {
   update(vehicle: Vehicle, dt: number): void;
 }
 
-/** Resolve collisions between vehicles using a circle for each vehicle. */
+/** Resolve collisions between vehicles using oriented rectangles and the separating axis theorem. */
 export function resolveVehiclePairs(
   vehicles: Vehicle[],
   onImpact?: (a: Vehicle, b: Vehicle, speed: number) => void,
@@ -243,12 +253,34 @@ export function resolveVehiclePairs(
       const dx = b.position.x - a.position.x;
       const dz = b.position.z - a.position.z;
       const dist = Math.hypot(dx, dz);
-      const minDist = a.spec.length * 0.42 + b.spec.length * 0.42;
-      if (dist > minDist || dist < 1e-4) continue;
-
-      const nx = dx / dist;
-      const nz = dz / dist;
-      const overlap = minDist - dist;
+      if (dist > (Math.hypot(a.spec.length, a.spec.width) + Math.hypot(b.spec.length, b.spec.width)) / 2) continue;
+      const afx = Math.sin(a.yaw);
+      const afz = Math.cos(a.yaw);
+      const bfx = Math.sin(b.yaw);
+      const bfz = Math.cos(b.yaw);
+      const axes = [[afx, afz], [-afz, afx], [bfx, bfz], [-bfz, bfx]];
+      let overlap = Infinity;
+      let nx = 0;
+      let nz = 0;
+      for (const [ax, az] of axes) {
+        const aRadius = Math.abs(ax * afx + az * afz) * a.spec.length / 2 +
+          Math.abs(-ax * afz + az * afx) * a.spec.width / 2;
+        const bRadius = Math.abs(ax * bfx + az * bfz) * b.spec.length / 2 +
+          Math.abs(-ax * bfz + az * bfx) * b.spec.width / 2;
+        const projected = dx * ax + dz * az;
+        const depth = aRadius + bRadius - Math.abs(projected);
+        if (depth <= 0) {
+          overlap = 0;
+          break;
+        }
+        if (depth < overlap) {
+          overlap = depth;
+          const sign = projected < 0 ? -1 : 1;
+          nx = ax * sign;
+          nz = az * sign;
+        }
+      }
+      if (overlap <= 0) continue;
 
       const ma = a.spec.mass;
       const mb = b.spec.mass;

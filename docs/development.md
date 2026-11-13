@@ -81,6 +81,7 @@ city should stay in the low hundreds.
 | New UI element | `index.html` + `styles.css` + `HUD.ts` |
 | New screen or setting | `Menus.ts` (and `Settings` in the same file) |
 | New sound | `systems/Audio.ts` (`play()` switch) |
+| Building entrances and curb strips | `world/City.ts` (merged geometry) |
 | New street furniture | `world/Props.ts` (instanced) |
 | New building shape or district | `world/City.ts` + `world/Layout.ts` |
 | New traffic behaviour | `entities/Traffic.ts` |

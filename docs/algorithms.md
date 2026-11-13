@@ -70,7 +70,7 @@ building boxes.
 - **`resolveCircle(x, z, r)`** pushes a circle out of every overlapping box,
   up to three relaxation passes, and returns the separation vector and the
   surface normal. Used by cars (two circles, front and rear) and by the player.
-- **`raycast(x0, z0, x1, z1, minHeight)`** marches the segment in 1.4 m steps
+- **`raycast(x0, z0, x1, z1, minHeight)`** intersects the segment with box slabs
   and reports the first box entered, plus the face normal. Used for bullets,
   police wall avoidance and camera occlusion.
 - **`rayDistance(...)`** returns the distance to the first obstacle, used to
@@ -178,7 +178,7 @@ leak across a pause.
 ## Headless testing helpers
 
 `Game.simulate(seconds)` runs the update loop deterministically and calls
-`input.endFrame()` after each step, which means one-shot input (a key press)
+`input.endStep()` after each step, which means one-shot input (a key press)
 is consumed exactly once — the same guarantee the real frame loop provides.
 Without that, a key press would be seen by every simulated step and the player
 would enter and immediately exit a vehicle.
@@ -188,3 +188,9 @@ what is actually attached to the scene graph (`renderedVehicles`,
 `renderedPeds`). The smoke test compares those against the simulated counts,
 which is how the "entities that simulate but never render" class of bug was
 caught.
+
+Vehicle pair contacts use the separating axis theorem over each body’s forward
+and lateral axes. Minimum penetration determines the separation normal.
+Coincident centres are separated along a body axis. Embedded building circles
+are pushed to the nearest face plus their radius. Ray queries return the nearest
+exact intersection, including thin walls and segment origins inside colliders.

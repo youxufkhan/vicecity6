@@ -354,11 +354,20 @@ export function buildCity(seed = 20261113): City {
 
   const walkTex = sidewalkTexture();
   const walkGeos: THREE.BufferGeometry[] = [];
+  const curbGeos: THREE.BufferGeometry[] = [];
+  const curbColor = new THREE.Color('#b7afa0');
   const lotGeos = new Map<LotKind, THREE.BufferGeometry[]>();
   for (const block of blocks) {
     walkGeos.push(
       makeRectXZ(block.cx, block.cz, block.maxX - block.minX, block.maxZ - block.minZ, 0.025, 16, 16),
     );
+    // Leave the intersection corners clear for pedestrian crossings.
+    for (const side of [-1, 1]) {
+      curbGeos.push(makeColoredBox(block.maxX - block.minX - 10, 0.12, 0.22,
+        block.cx, 0.06, block.cz + side * (block.maxZ - block.minZ) / 2, curbColor));
+      curbGeos.push(makeColoredBox(0.22, 0.12, block.maxZ - block.minZ - 10,
+        block.cx + side * (block.maxX - block.minX) / 2, 0.06, block.cz, curbColor));
+    }
     const kind = DISTRICT_LOT[block.district];
     if (!lotGeos.has(kind)) lotGeos.set(kind, []);
     lotGeos.get(kind)!.push(
@@ -378,6 +387,9 @@ export function buildCity(seed = 20261113): City {
   const walkMesh = new THREE.Mesh(mergeAll(walkGeos)!, walkMat);
   walkMesh.receiveShadow = true;
   group.add(walkMesh);
+  const curbs = new THREE.Mesh(mergeAll(curbGeos)!, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+  curbs.receiveShadow = true;
+  group.add(curbs);
 
   for (const [kind, geos] of lotGeos) {
     const tex = lotTexture(kind, kind.length * 13);
@@ -419,6 +431,7 @@ export function buildCity(seed = 20261113): City {
 
   const facadeBuckets = new Map<FacadeKind, THREE.BufferGeometry[]>();
   const roofPropGeos: THREE.BufferGeometry[] = [];
+  let entranceCount = 0;
   const roofPropColor = new THREE.Color('#8b8f95');
 
   for (const spec of specs) {
@@ -460,6 +473,22 @@ export function buildCity(seed = 20261113): City {
         height: spec.h,
       });
     }
+
+    // Ground-floor doors and canopies give the facade a human scale.
+    const frontZ = spec.z + spec.d / 2;
+    const doorWidth = spec.district === 'industrial' ? 4.2 : 1.8;
+    const doorHeight = spec.district === 'industrial' ? 3.5 : 2.6;
+    const trim = new THREE.Color('#d5c8ad');
+    const glass = new THREE.Color('#22343e');
+    roofPropGeos.push(makeColoredBox(doorWidth + 0.4, doorHeight + 0.25, 0.14,
+      spec.x, (doorHeight + 0.25) / 2, frontZ + 0.03, trim));
+    roofPropGeos.push(makeColoredBox(doorWidth, doorHeight, 0.16,
+      spec.x, doorHeight / 2, frontZ + 0.07, glass));
+    roofPropGeos.push(makeColoredBox(0.06, doorHeight, 0.18,
+      spec.x, doorHeight / 2, frontZ + 0.09, trim));
+    roofPropGeos.push(makeColoredBox(doorWidth + 1.2, 0.18, 1.1,
+      spec.x, doorHeight + 0.45, frontZ + 0.45, spec.color.clone().multiplyScalar(0.65)));
+    entranceCount++;
 
     // Roof clutter.
     if (spec.h > 12 && rng.chance(0.75)) {
@@ -524,6 +553,7 @@ export function buildCity(seed = 20261113): City {
     );
     roofMesh.castShadow = true;
     roofMesh.receiveShadow = true;
+    roofMesh.userData.entrances = entranceCount;
     group.add(roofMesh);
   }
 

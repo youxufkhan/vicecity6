@@ -169,3 +169,10 @@ are all generated from fixed seeds:
 
 The same build always produces the same city, which is what makes the
 screenshot tour and the headless tests reproducible.
+
+## Street-level detail
+
+Buildings have ground-floor door panels, frames, centre mullions and projecting
+canopies. Industrial entrances use taller, wider doors. These details share the
+existing merged vertex-colour mesh. Low concrete curb strips outline blocks
+with gaps at intersection corners and cost one additional draw call.

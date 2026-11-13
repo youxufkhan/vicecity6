@@ -94,6 +94,7 @@ export class Pedestrian {
     this.rig = buildRig(rng);
     this.group.add(this.rig.group);
     this.group.position.set(x, 0, z);
+    this.pathDir = rng.chance(0.5) ? 1 : -1;
     this.speed = rng.range(1.05, 1.75);
   }
 
@@ -144,7 +145,6 @@ export class Pedestrian {
   setPath(path: WalkPath, offset = 0): void {
     this.path = path;
     this.pathDistance = offset;
-    this.pathDir = Math.random() < 0.5 ? 1 : -1;
   }
 
   get onPath(): boolean {
@@ -681,11 +681,9 @@ export class PedManager {
         continue;
       }
 
-      // Flee from gunfire, from the player, and from dangerously approaching vehicles.
+      // Gunfire and horns trigger panic explicitly; proximity alone is peaceful.
       if (ped.state !== 'dead' && ped.state !== 'stunned') {
-        if (dist < 14) {
-          ped.fleeFrom(playerX, playerZ);
-        } else if (vehicles) {
+        if (vehicles) {
           for (let v = 0; v < vehicles.length; v++) {
             const car = vehicles[v];
             if (Math.abs(car.forwardSpeed) < 4.0) continue;

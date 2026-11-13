@@ -80,13 +80,13 @@ can drive the game deterministically without depending on wall-clock time.
 | --- | --- | --- |
 | `title` | Main menu over a slow orbit of the city | Traffic updates, camera orbits |
 | `playing` | Live gameplay | Everything |
-| `paused` | Pause menu (also entered when the pointer lock is lost) | World breathes, no input |
+| `paused` | Pause menu (also entered when the pointer lock is lost) | Simulation frozen |
 | `wasted` | Player died / was busted | World breathes, no input |
 | `clear` | Mission passed | World breathes, no input |
 
 `update()` dispatches to `updateTitle`, `updatePlaying` or `updateIdle`; the
-effects, props and signal updates run in every state so the scene stays alive
-behind menus.
+effects, props and signal updates freeze in the pause menu and while the map
+is open. Other menu states retain their background animation.
 
 ## Order of operations inside `updatePlaying`
 
