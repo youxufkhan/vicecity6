@@ -334,6 +334,151 @@ function baseFor(spec: CarSpec) {
   applyColor(bPillarR, new THREE.Color('#16181c'));
   trimParts.push(bPillarL, bPillarR);
 
+  // Front and rear license plates (retro state cream/yellow plate with dark border frame)
+  const fPlateBorder = boxGeo(0.44, 0.20, 0.03, 0, spec.bodyBottom + spec.bodyHeight * 0.24, l / 2 + 0.085);
+  applyColor(fPlateBorder, new THREE.Color('#111315'));
+  const fPlate = boxGeo(0.42, 0.18, 0.04, 0, spec.bodyBottom + spec.bodyHeight * 0.24, l / 2 + 0.095);
+  applyColor(fPlate, new THREE.Color('#fef2b8'));
+
+  const rPlateBorder = boxGeo(0.44, 0.20, 0.03, 0, spec.bodyBottom + spec.bodyHeight * 0.24, -l / 2 - 0.085);
+  applyColor(rPlateBorder, new THREE.Color('#111315'));
+  const rPlate = boxGeo(0.42, 0.18, 0.04, 0, spec.bodyBottom + spec.bodyHeight * 0.24, -l / 2 - 0.095);
+  applyColor(rPlate, new THREE.Color('#fef2b8'));
+  trimParts.push(fPlateBorder, fPlate, rPlateBorder, rPlate);
+
+  // Interior dashboard and steering wheel column (positioned under the windshield)
+  const dashBody = boxGeo(
+    spec.cabinWidth * 0.82,
+    0.18,
+    spec.cabinLength * 0.28,
+    0,
+    spec.bodyBottom + spec.bodyHeight + 0.04,
+    spec.cabinZ + spec.cabinLength * 0.26,
+  );
+  applyColor(dashBody, new THREE.Color('#1a1c20'));
+
+  const gaugeBinnacle = boxGeo(
+    0.28,
+    0.08,
+    0.16,
+    spec.cabinWidth * 0.24,
+    spec.bodyBottom + spec.bodyHeight + 0.14,
+    spec.cabinZ + spec.cabinLength * 0.22,
+  );
+  applyColor(gaugeBinnacle, new THREE.Color('#121316'));
+
+  const gaugeDisplay = boxGeo(
+    0.24,
+    0.05,
+    0.02,
+    spec.cabinWidth * 0.24,
+    spec.bodyBottom + spec.bodyHeight + 0.14,
+    spec.cabinZ + spec.cabinLength * 0.22 - 0.08,
+  );
+  applyColor(gaugeDisplay, new THREE.Color('#38bdf8'));
+
+  const steeringCol = boxGeo(
+    0.06,
+    0.06,
+    0.18,
+    spec.cabinWidth * 0.24,
+    spec.bodyBottom + spec.bodyHeight + 0.10,
+    spec.cabinZ + spec.cabinLength * 0.14,
+  );
+  applyColor(steeringCol, new THREE.Color('#15171a'));
+
+  const steeringWheel = boxGeo(
+    0.24,
+    0.24,
+    0.03,
+    spec.cabinWidth * 0.24,
+    spec.bodyBottom + spec.bodyHeight + 0.15,
+    spec.cabinZ + spec.cabinLength * 0.06,
+  );
+  applyColor(steeringWheel, new THREE.Color('#1e2025'));
+
+  const centerConsole = boxGeo(
+    0.16,
+    0.22,
+    0.26,
+    0,
+    spec.bodyBottom + spec.bodyHeight * 0.70,
+    spec.cabinZ + spec.cabinLength * 0.14,
+  );
+  applyColor(centerConsole, new THREE.Color('#141518'));
+
+  trimParts.push(dashBody, gaugeBinnacle, gaugeDisplay, steeringCol, steeringWheel, centerConsole);
+
+  // Thin dark door seam lines along both sides
+  for (const side of [1, -1]) {
+    const sideX = side * (w * 0.471);
+    const seamFront = boxGeo(
+      0.012,
+      spec.bodyHeight * 0.52,
+      0.02,
+      sideX,
+      spec.bodyBottom + spec.bodyHeight * 0.48,
+      spec.cabinZ + spec.cabinLength * 0.35,
+    );
+    applyColor(seamFront, new THREE.Color('#0c0e12'));
+    const seamRear = boxGeo(
+      0.012,
+      spec.bodyHeight * 0.52,
+      0.02,
+      sideX,
+      spec.bodyBottom + spec.bodyHeight * 0.48,
+      spec.cabinZ - spec.cabinLength * 0.35,
+    );
+    applyColor(seamRear, new THREE.Color('#0c0e12'));
+    const seamLower = boxGeo(
+      0.012,
+      0.018,
+      spec.cabinLength * 0.72,
+      sideX,
+      spec.bodyBottom + spec.bodyHeight * 0.22,
+      spec.cabinZ,
+    );
+    applyColor(seamLower, new THREE.Color('#0c0e12'));
+
+    trimParts.push(seamFront, seamRear, seamLower);
+
+    if (spec.id !== 'sports' && spec.id !== 'coupe') {
+      const seamMid = boxGeo(
+        0.012,
+        spec.bodyHeight * 0.50,
+        0.02,
+        sideX,
+        spec.bodyBottom + spec.bodyHeight * 0.47,
+        spec.cabinZ,
+      );
+      applyColor(seamMid, new THREE.Color('#0c0e12'));
+      trimParts.push(seamMid);
+    }
+  }
+
+  // Recessed door handles along sides
+  for (const side of [1, -1]) {
+    const sideX = side * (w * 0.472);
+    const handleY = spec.bodyBottom + spec.bodyHeight * 0.68;
+    const isTwoDoor = spec.id === 'sports' || spec.id === 'coupe';
+    const frontHandleZ = isTwoDoor ? spec.cabinZ - 0.06 : spec.cabinZ + spec.cabinLength * 0.12;
+
+    const fPocket = boxGeo(0.015, 0.045, 0.13, sideX, handleY, frontHandleZ);
+    applyColor(fPocket, new THREE.Color('#0c0d10'));
+    const fBar = boxGeo(0.022, 0.020, 0.09, sideX + side * 0.002, handleY, frontHandleZ);
+    applyColor(fBar, new THREE.Color('#c2cad4'));
+    trimParts.push(fPocket, fBar);
+
+    if (!isTwoDoor) {
+      const rearHandleZ = spec.cabinZ - spec.cabinLength * 0.24;
+      const rPocket = boxGeo(0.015, 0.045, 0.13, sideX, handleY, rearHandleZ);
+      applyColor(rPocket, new THREE.Color('#0c0d10'));
+      const rBar = boxGeo(0.022, 0.020, 0.09, sideX + side * 0.002, handleY, rearHandleZ);
+      applyColor(rBar, new THREE.Color('#c2cad4'));
+      trimParts.push(rPocket, rBar);
+    }
+  }
+
   if (spec.id === 'sports') {
     const stanchionL = boxGeo(0.05, 0.24, 0.10, w * 0.25, spec.bodyBottom + spec.bodyHeight + 0.24, -l * 0.44);
     applyColor(stanchionL, new THREE.Color('#141619'));
@@ -344,6 +489,37 @@ function baseFor(spec: CarSpec) {
     const wingletR = boxGeo(0.05, 0.12, 0.24, -w * 0.48, spec.bodyBottom + 0.08, l / 2 - 0.06);
     applyColor(wingletR, new THREE.Color('#141619'));
     trimParts.push(stanchionL, stanchionR, wingletL, wingletR);
+
+    // Side air intake scoops on rear quarter panels
+    for (const side of [1, -1]) {
+      const scoopDuct = boxGeo(0.04, 0.22, 0.34, side * (w * 0.482), spec.bodyBottom + spec.bodyHeight * 0.42, -0.85);
+      applyColor(scoopDuct, new THREE.Color('#15171b'));
+      const scoopMouth = boxGeo(0.035, 0.18, 0.05, side * (w * 0.485), spec.bodyBottom + spec.bodyHeight * 0.42, -0.68);
+      applyColor(scoopMouth, new THREE.Color('#08090a'));
+      const strakeTop = boxGeo(0.038, 0.018, 0.26, side * (w * 0.488), spec.bodyBottom + spec.bodyHeight * 0.48, -0.82);
+      applyColor(strakeTop, new THREE.Color('#1b1e24'));
+      const strakeBottom = boxGeo(0.038, 0.018, 0.26, side * (w * 0.488), spec.bodyBottom + spec.bodyHeight * 0.36, -0.82);
+      applyColor(strakeBottom, new THREE.Color('#1b1e24'));
+      trimParts.push(scoopDuct, scoopMouth, strakeTop, strakeBottom);
+    }
+  } else if (spec.id === 'coupe') {
+    // Subtle performance hood scoop
+    const scoopCowl = boxGeo(w * 0.26, 0.045, 0.32, 0, spec.bodyBottom + spec.bodyHeight * 0.95, l * 0.28);
+    applyColor(scoopCowl, new THREE.Color('#181b20'));
+    const scoopMouth = boxGeo(w * 0.22, 0.025, 0.04, 0, spec.bodyBottom + spec.bodyHeight * 0.945, l * 0.28 + 0.16);
+    applyColor(scoopMouth, new THREE.Color('#08090b'));
+
+    // Twin exhaust tips (forming dual-twin exhaust quad setup)
+    const exhaustL2 = boxGeo(0.10, 0.08, 0.22, w * 0.18, spec.bodyBottom + 0.12, -l / 2 - 0.04);
+    applyColor(exhaustL2, new THREE.Color('#d8dee9'));
+    const exhaustL2In = boxGeo(0.06, 0.05, 0.05, w * 0.18, spec.bodyBottom + 0.12, -l / 2 - 0.13);
+    applyColor(exhaustL2In, new THREE.Color('#0d0e10'));
+    const exhaustR2 = boxGeo(0.10, 0.08, 0.22, -w * 0.18, spec.bodyBottom + 0.12, -l / 2 - 0.04);
+    applyColor(exhaustR2, new THREE.Color('#d8dee9'));
+    const exhaustR2In = boxGeo(0.06, 0.05, 0.05, -w * 0.18, spec.bodyBottom + 0.12, -l / 2 - 0.13);
+    applyColor(exhaustR2In, new THREE.Color('#0d0e10'));
+
+    trimParts.push(scoopCowl, scoopMouth, exhaustL2, exhaustL2In, exhaustR2, exhaustR2In);
   } else if (spec.id === 'suv') {
     const railL = boxGeo(0.05, 0.05, spec.cabinLength * 0.85, spec.cabinWidth * 0.40, spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.06, spec.cabinZ);
     applyColor(railL, new THREE.Color('#b0b6c0'));
@@ -491,18 +667,42 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
     applyColor(takedown, new THREE.Color('#f0f4ff'));
     extraParts.push(takedown);
 
-    // Front push-bar / bullbar
-    const bullBarL = boxGeo(0.06, 0.32, 0.16, spec.width * 0.20, spec.bodyBottom + spec.bodyHeight * 0.35, spec.length / 2 + 0.10);
-    applyColor(bullBarL, new THREE.Color('#1a1d22'));
-    extraParts.push(bullBarL);
+    // Front heavy-duty push-bar / bullbar with vertical uprights and dual crossbars
+    const bullBarL = boxGeo(0.07, 0.40, 0.18, spec.width * 0.22, spec.bodyBottom + spec.bodyHeight * 0.36, spec.length / 2 + 0.11);
+    applyColor(bullBarL, new THREE.Color('#15171b'));
+    const bullBarR = boxGeo(0.07, 0.40, 0.18, -spec.width * 0.22, spec.bodyBottom + spec.bodyHeight * 0.36, spec.length / 2 + 0.11);
+    applyColor(bullBarR, new THREE.Color('#15171b'));
 
-    const bullBarR = boxGeo(0.06, 0.32, 0.16, -spec.width * 0.20, spec.bodyBottom + spec.bodyHeight * 0.35, spec.length / 2 + 0.10);
-    applyColor(bullBarR, new THREE.Color('#1a1d22'));
-    extraParts.push(bullBarR);
+    const padL = boxGeo(0.08, 0.38, 0.04, spec.width * 0.22, spec.bodyBottom + spec.bodyHeight * 0.36, spec.length / 2 + 0.205);
+    applyColor(padL, new THREE.Color('#262930'));
+    const padR = boxGeo(0.08, 0.38, 0.04, -spec.width * 0.22, spec.bodyBottom + spec.bodyHeight * 0.36, spec.length / 2 + 0.205);
+    applyColor(padR, new THREE.Color('#262930'));
 
-    const crossBar = boxGeo(spec.width * 0.44, 0.06, 0.12, 0, spec.bodyBottom + spec.bodyHeight * 0.42, spec.length / 2 + 0.14);
-    applyColor(crossBar, new THREE.Color('#1a1d22'));
-    extraParts.push(crossBar);
+    const crossBarLow = boxGeo(spec.width * 0.50, 0.055, 0.08, 0, spec.bodyBottom + spec.bodyHeight * 0.26, spec.length / 2 + 0.15);
+    applyColor(crossBarLow, new THREE.Color('#15171b'));
+    const crossBarHigh = boxGeo(spec.width * 0.50, 0.055, 0.08, 0, spec.bodyBottom + spec.bodyHeight * 0.46, spec.length / 2 + 0.15);
+    applyColor(crossBarHigh, new THREE.Color('#15171b'));
+
+    const wingL = boxGeo(spec.width * 0.24, 0.04, 0.05, spec.width * 0.36, spec.bodyBottom + spec.bodyHeight * 0.38, spec.length / 2 + 0.12);
+    applyColor(wingL, new THREE.Color('#181b20'));
+    const wingR = boxGeo(spec.width * 0.24, 0.04, 0.05, -spec.width * 0.36, spec.bodyBottom + spec.bodyHeight * 0.38, spec.length / 2 + 0.12);
+    applyColor(wingR, new THREE.Color('#181b20'));
+
+    extraParts.push(bullBarL, bullBarR, padL, padR, crossBarLow, crossBarHigh, wingL, wingR);
+
+    // Driver's side A-pillar spotlight (left-hand side in US)
+    const spotY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight * 0.28;
+    const spotZ = spec.cabinZ + spec.cabinLength * 0.34;
+    const spotArm = boxGeo(0.10, 0.03, 0.03, spec.cabinWidth * 0.49, spotY, spotZ);
+    applyColor(spotArm, new THREE.Color('#16181c'));
+    const spotHousing = boxGeo(0.11, 0.11, 0.13, spec.cabinWidth * 0.55, spotY, spotZ + 0.04);
+    applyColor(spotHousing, new THREE.Color('#111215'));
+    const spotLens = boxGeo(0.09, 0.09, 0.02, spec.cabinWidth * 0.55, spotY, spotZ + 0.11);
+    applyColor(spotLens, new THREE.Color('#fff8db'));
+    const spotPivot = boxGeo(0.04, 0.07, 0.04, spec.cabinWidth * 0.55, spotY - 0.03, spotZ - 0.04);
+    applyColor(spotPivot, new THREE.Color('#c8d0da'));
+
+    extraParts.push(spotArm, spotHousing, spotLens, spotPivot);
   } else if (livery === 'taxi') {
     // Checkerboard stripe along the doors
     const checkerL = boxGeo(0.04, spec.bodyHeight * 0.14, spec.length * 0.65, spec.width * 0.48, spec.bodyBottom + spec.bodyHeight * 0.48, 0);
@@ -513,15 +713,31 @@ function paintShell(spec: CarSpec, paint: string, livery: Livery): THREE.BufferG
     applyColor(checkerR, new THREE.Color('#15181c'));
     extraParts.push(checkerR);
 
-    // Illuminated roof TAXI medallion sign
+    // Illuminated roof TAXI medallion sign with black "TAXI" lettering bars and amber glow tint
     const roofY = spec.bodyBottom + spec.bodyHeight + spec.cabinHeight + 0.12;
-    const taxiBox = boxGeo(spec.cabinWidth * 0.42, 0.14, 0.26, 0, roofY, spec.cabinZ);
-    applyColor(taxiBox, new THREE.Color('#ffbb00'));
-    extraParts.push(taxiBox);
 
-    const taxiBase = boxGeo(spec.cabinWidth * 0.46, 0.04, 0.30, 0, roofY - 0.08, spec.cabinZ);
-    applyColor(taxiBase, new THREE.Color('#1a1d22'));
-    extraParts.push(taxiBase);
+    const taxiBase = boxGeo(spec.cabinWidth * 0.46, 0.03, 0.28, 0, roofY - 0.07, spec.cabinZ);
+    applyColor(taxiBase, new THREE.Color('#181b20'));
+
+    const footL = boxGeo(0.04, 0.05, 0.22, spec.cabinWidth * 0.21, roofY - 0.07, spec.cabinZ);
+    applyColor(footL, new THREE.Color('#111214'));
+    const footR = boxGeo(0.04, 0.05, 0.22, -spec.cabinWidth * 0.21, roofY - 0.07, spec.cabinZ);
+    applyColor(footR, new THREE.Color('#111214'));
+
+    const taxiBox = boxGeo(spec.cabinWidth * 0.42, 0.15, 0.24, 0, roofY, spec.cabinZ);
+    applyColor(taxiBox, new THREE.Color('#ffaa00'));
+
+    // Black "TAXI" lettering bars on front and rear faces
+    const taxiBarFront = boxGeo(spec.cabinWidth * 0.32, 0.065, 0.02, 0, roofY, spec.cabinZ + 0.125);
+    applyColor(taxiBarFront, new THREE.Color('#111214'));
+    const taxiBarRear = boxGeo(spec.cabinWidth * 0.32, 0.065, 0.02, 0, roofY, spec.cabinZ - 0.125);
+    applyColor(taxiBarRear, new THREE.Color('#111214'));
+
+    // Amber medallion crown flasher
+    const taxiBeacon = boxGeo(spec.cabinWidth * 0.14, 0.04, 0.12, 0, roofY + 0.09, spec.cabinZ);
+    applyColor(taxiBeacon, new THREE.Color('#ff7700'));
+
+    extraParts.push(taxiBase, footL, footR, taxiBox, taxiBarFront, taxiBarRear, taxiBeacon);
   }
 
   return mergeParts(extraParts);

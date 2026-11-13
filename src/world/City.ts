@@ -40,6 +40,7 @@ export interface City {
   carSpawns: CitySpawn[];
   pedSpawns: CitySpawn[];
   facadeMaterials: THREE.MeshStandardMaterial[];
+  neonMaterials: THREE.MeshStandardMaterial[];
   water: THREE.Mesh;
   waterTexture: THREE.Texture;
   parkSpots: THREE.Vector3[];
@@ -54,6 +55,7 @@ interface BuildingSpec {
   podium: number;
   facade: FacadeKind;
   color: THREE.Color;
+  district: District;
 }
 
 const DISTRICT_COLORS: Record<District, string[]> = {
@@ -127,6 +129,7 @@ function buildingsForBlock(block: Block, rng: Rng): BuildingSpec[] {
       podium: 14,
       facade: 'glass',
       color: new THREE.Color('#8fb6d8'),
+      district: block.district,
     });
     return specs;
   }
@@ -146,6 +149,7 @@ function buildingsForBlock(block: Block, rng: Rng): BuildingSpec[] {
           podium: rng.chance(0.55) ? rng.range(6, 14) : 0,
           facade: pickFacade(),
           color: pickColor(),
+          district: block.district,
         });
       }
       break;
@@ -166,6 +170,7 @@ function buildingsForBlock(block: Block, rng: Rng): BuildingSpec[] {
           podium: rng.chance(0.3) ? rng.range(3, 7) : 0,
           facade: pickFacade(),
           color: pickColor(),
+          district: block.district,
         });
       }
       break;
@@ -182,6 +187,7 @@ function buildingsForBlock(block: Block, rng: Rng): BuildingSpec[] {
         podium: 0,
         facade: pickFacade(),
         color: pickColor(),
+        district: block.district,
       });
       break;
     }
@@ -199,6 +205,7 @@ function buildingsForBlock(block: Block, rng: Rng): BuildingSpec[] {
           podium: 0,
           facade: pickFacade(),
           color: pickColor(),
+          district: block.district,
         });
       }
       break;
@@ -217,6 +224,7 @@ function buildingsForBlock(block: Block, rng: Rng): BuildingSpec[] {
           podium: rng.chance(0.35) ? rng.range(3, 5) : 0,
           facade: pickFacade(),
           color: pickColor(),
+          district: block.district,
         });
       }
       break;
@@ -518,13 +526,95 @@ export function buildCity(seed = 20261113): City {
     group.add(roofMesh);
   }
 
+  /* ─────────────── neon signs ─────────────── */
+
+  const neonMaterials: THREE.MeshStandardMaterial[] = [];
+  const NEON_PALETTE = ['#ff2e88', '#35e0ff', '#ffd45e', '#58f5b5', '#c77dff'];
+
+  for (const spec of specs) {
+    if (spec.district !== 'downtown' && spec.district !== 'uptown' && spec.district !== 'beach') {
+      continue;
+    }
+    // Place 1-2 neon signs on facade walls for ~50% of buildings in downtown, uptown, and beach.
+    if (!rng.chance(0.5)) continue;
+
+    const signCount = rng.int(1, 2);
+    const wall1 = rng.int(0, 3);
+    const wall2 = (wall1 + rng.int(1, 3)) % 4;
+    const chosenWalls = signCount === 1 ? [wall1] : [wall1, wall2];
+
+    for (let i = 0; i < chosenWalls.length; i++) {
+      const wall = chosenWalls[i];
+      let signY: number;
+      if (spec.district === 'beach') {
+        signY = i === 0
+          ? rng.range(3.2, Math.max(3.5, spec.h * 0.48))
+          : rng.range(Math.max(3.6, spec.h * 0.5), Math.max(3.8, spec.h - 1.5));
+      } else if (spec.district === 'uptown') {
+        signY = rng.range(3.5, Math.min(16, spec.h - 2.5));
+      } else {
+        // downtown
+        signY = rng.range(4.5, Math.min(26, spec.h - 4.0));
+      }
+
+      const isUpper = spec.podium > 0 && signY > spec.podium;
+      const halfW = isUpper ? (spec.w * 0.72) / 2 : spec.w / 2;
+      const halfD = isUpper ? (spec.d * 0.72) / 2 : spec.d / 2;
+
+      const spanHalf = (wall === 0 || wall === 1) ? halfW : halfD;
+      const maxSpan = spanHalf * 2;
+      const signW = Math.max(2.0, Math.min(4.5, maxSpan * 0.8));
+      const signH = 1.4;
+
+      const colorHex = NEON_PALETTE[rng.int(0, NEON_PALETTE.length - 1)];
+      const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        emissive: new THREE.Color(colorHex),
+        emissiveIntensity: 2.0,
+        roughness: 0.25,
+        metalness: 0.1,
+        side: THREE.DoubleSide,
+      });
+      neonMaterials.push(mat);
+
+      const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(signW, signH), mat);
+      const maxShift = Math.max(0, (spanHalf - signW / 2) * 0.7);
+      const shift = rng.range(-maxShift, maxShift);
+      const eps = 0.08;
+
+      if (wall === 0) {
+        // South (+Z)
+        signMesh.position.set(spec.x + shift, signY, spec.z + halfD + eps);
+        signMesh.rotation.y = 0;
+      } else if (wall === 1) {
+        // North (-Z)
+        signMesh.position.set(spec.x + shift, signY, spec.z - halfD - eps);
+        signMesh.rotation.y = Math.PI;
+      } else if (wall === 2) {
+        // East (+X)
+        signMesh.position.set(spec.x + halfW + eps, signY, spec.z + shift);
+        signMesh.rotation.y = Math.PI / 2;
+      } else {
+        // West (-X)
+        signMesh.position.set(spec.x - halfW - eps, signY, spec.z + shift);
+        signMesh.rotation.y = -Math.PI / 2;
+      }
+
+      signMesh.receiveShadow = false;
+      signMesh.castShadow = false;
+      group.add(signMesh);
+    }
+  }
+
   /* ─────────────── ocean ─────────────── */
 
   const wTex = waterTexture();
   wTex.repeat.set(60, 60);
   const waterMat = new THREE.MeshStandardMaterial({
     map: wTex,
-    color: new THREE.Color('#2a6d99'),
+    color: new THREE.Color(0x006e90),
+    emissive: new THREE.Color(0x001f35),
+    emissiveIntensity: 0.35,
     roughness: 0.18,
     metalness: 0.55,
     transparent: true,
@@ -601,6 +691,7 @@ export function buildCity(seed = 20261113): City {
     carSpawns,
     pedSpawns,
     facadeMaterials,
+    neonMaterials,
     water,
     waterTexture: wTex,
     parkSpots,

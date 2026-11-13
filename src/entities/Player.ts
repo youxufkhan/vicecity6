@@ -17,82 +17,150 @@ function limb(w: number, h: number, d: number, color: string): THREE.Mesh {
   return mesh;
 }
 
+function gunMesh(
+  w: number,
+  h: number,
+  d: number,
+  color: string | number,
+  metalness = 0.1,
+  roughness = 0.8,
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({
+      color: new THREE.Color(color),
+      roughness,
+      metalness,
+    }),
+  );
+  mesh.castShadow = true;
+  return mesh;
+}
+
 function buildPistol(): THREE.Group {
   const g = new THREE.Group();
-  // Slide & barrel (two-tone steel)
-  const slide = limb(0.065, 0.08, 0.28, '#1f242d');
-  slide.position.set(0, 0.04, -0.09);
+
+  // Slide: polished nickel / chrome silver (#e2e8f0, metalness: 0.92, roughness: 0.15)
+  // Dimensions increased ~25% (0.08 x 0.10 x 0.35) so it stands out distinctly
+  const slide = gunMesh(0.08, 0.10, 0.35, '#e2e8f0', 0.92, 0.15);
+  slide.position.set(0, 0.05, 0.08);
   g.add(slide);
-  // Barrel bore
-  const barrel = limb(0.045, 0.045, 0.06, '#0f1115');
-  barrel.position.set(0, 0.04, -0.24);
+
+  // Barrel bore: dark steel at front of slide
+  const barrel = gunMesh(0.055, 0.055, 0.06, '#1a1d24', 0.8, 0.25);
+  barrel.position.set(0, 0.05, 0.26);
   g.add(barrel);
-  // Textured grip
-  const grip = limb(0.055, 0.16, 0.09, '#4a3325');
-  grip.position.set(0, -0.06, 0.01);
-  grip.rotation.x = 0.22;
+
+  // Grip: rich mahogany wood (#5c2810)
+  const grip = gunMesh(0.065, 0.18, 0.11, '#5c2810', 0.05, 0.72);
+  grip.position.set(0, -0.07, -0.01);
+  grip.rotation.x = -0.22;
   g.add(grip);
-  // Trigger guard
-  const guard = limb(0.035, 0.06, 0.08, '#1f242d');
-  guard.position.set(0, -0.02, -0.05);
+
+  // Trigger guard: polished nickel
+  const guard = gunMesh(0.04, 0.07, 0.09, '#e2e8f0', 0.92, 0.15);
+  guard.position.set(0, -0.02, 0.06);
   g.add(guard);
+
+  // Trigger: gold / brass (#d4af37, metalness: 0.8, roughness: 0.3)
+  const trigger = gunMesh(0.02, 0.045, 0.03, '#d4af37', 0.8, 0.3);
+  trigger.position.set(0, -0.02, 0.06);
+  g.add(trigger);
+
+  // Hammer: gold / brass (#d4af37, metalness: 0.8, roughness: 0.3)
+  const hammer = gunMesh(0.025, 0.04, 0.03, '#d4af37', 0.8, 0.3);
+  hammer.position.set(0, 0.08, -0.09);
+  g.add(hammer);
+
   // Sights
-  const frontSight = limb(0.02, 0.025, 0.03, '#ffffff');
-  frontSight.position.set(0, 0.085, -0.20);
+  const frontSight = gunMesh(0.02, 0.03, 0.035, '#ffffff', 0.1, 0.6);
+  frontSight.position.set(0, 0.11, 0.23);
   g.add(frontSight);
+
+  const rearSight = gunMesh(0.035, 0.03, 0.03, '#1a1d24', 0.8, 0.3);
+  rearSight.position.set(0, 0.11, -0.08);
+  g.add(rearSight);
+
   return g;
 }
 
 function buildSmg(): THREE.Group {
   const g = new THREE.Group();
-  // Receiver
-  const receiver = limb(0.08, 0.11, 0.36, '#181b22');
-  receiver.position.set(0, 0.04, -0.08);
+
+  // Receiver: crisp dark parkerized finish (#1e2229, metalness: 0.65, roughness: 0.35)
+  const receiver = gunMesh(0.09, 0.13, 0.42, '#1e2229', 0.65, 0.35);
+  receiver.position.set(0, 0.05, 0.06);
   g.add(receiver);
-  // Barrel & shroud
-  const barrel = limb(0.05, 0.05, 0.14, '#0f1216');
-  barrel.position.set(0, 0.04, -0.28);
+
+  // Chrome barrel nut / shroud (#dcdde1, metalness: 0.92, roughness: 0.15)
+  const barrelNut = gunMesh(0.07, 0.07, 0.06, '#dcdde1', 0.92, 0.15);
+  barrelNut.position.set(0, 0.05, 0.275);
+  g.add(barrelNut);
+
+  // Barrel
+  const barrel = gunMesh(0.05, 0.05, 0.14, '#0f1216', 0.8, 0.25);
+  barrel.position.set(0, 0.05, 0.35);
   g.add(barrel);
-  // Extended magazine
-  const mag = limb(0.045, 0.22, 0.065, '#262a33');
-  mag.position.set(0, -0.10, 0.02);
-  mag.rotation.x = 0.15;
-  g.add(mag);
+
+  // Curved magazine (curved banana mag)
+  const magUpper = gunMesh(0.05, 0.14, 0.07, '#262a33', 0.5, 0.45);
+  magUpper.position.set(0, -0.08, 0.11);
+  magUpper.rotation.x = -0.12;
+  g.add(magUpper);
+
+  const magLower = gunMesh(0.048, 0.12, 0.065, '#262a33', 0.5, 0.45);
+  magLower.position.set(0, -0.18, 0.14);
+  magLower.rotation.x = -0.30;
+  g.add(magLower);
+
   // Grip
-  const grip = limb(0.06, 0.15, 0.09, '#181b22');
-  grip.position.set(0, -0.06, 0.01);
-  grip.rotation.x = 0.22;
+  const grip = gunMesh(0.065, 0.16, 0.10, '#181b22', 0.2, 0.75);
+  grip.position.set(0, -0.07, -0.01);
+  grip.rotation.x = -0.22;
   g.add(grip);
+
   // Stock
-  const stock = limb(0.07, 0.08, 0.16, '#333a44');
-  stock.position.set(0, 0.03, 0.16);
+  const stock = gunMesh(0.07, 0.09, 0.20, '#333a44', 0.7, 0.4);
+  stock.position.set(0, 0.04, -0.21);
   g.add(stock);
+
   return g;
 }
 
 function buildShotgun(): THREE.Group {
   const g = new THREE.Group();
+
   // Long blued steel barrel
-  const barrel = limb(0.06, 0.06, 0.65, '#1e232a');
-  barrel.position.set(0, 0.05, -0.24);
+  const barrel = gunMesh(0.065, 0.065, 0.74, '#1b222c', 0.85, 0.22);
+  barrel.position.set(0, 0.06, 0.26);
   g.add(barrel);
+
   // Under-barrel magazine tube
-  const magTube = limb(0.055, 0.055, 0.52, '#252b34');
-  magTube.position.set(0, 0.0, -0.18);
+  const magTube = gunMesh(0.06, 0.06, 0.60, '#252b34', 0.8, 0.25);
+  magTube.position.set(0, 0.01, 0.20);
   g.add(magTube);
-  // Pump slide
-  const pump = limb(0.075, 0.08, 0.18, '#5c3924');
-  pump.position.set(0, 0.01, -0.26);
+
+  // Steel heat shield over the rear half of the barrel
+  const heatShield = gunMesh(0.075, 0.075, 0.30, '#475569', 0.82, 0.3);
+  heatShield.position.set(0, 0.07, 0.18);
+  g.add(heatShield);
+
+  // Realistic warm walnut wood pump slide (#5c341b)
+  const pump = gunMesh(0.085, 0.09, 0.20, '#5c341b', 0.05, 0.65);
+  pump.position.set(0, 0.01, 0.26);
   g.add(pump);
-  // Receiver
-  const receiver = limb(0.075, 0.11, 0.22, '#181b22');
-  receiver.position.set(0, 0.03, 0.1);
+
+  // Receiver: blued steel
+  const receiver = gunMesh(0.08, 0.12, 0.26, '#1b222c', 0.85, 0.22);
+  receiver.position.set(0, 0.04, -0.08);
   g.add(receiver);
-  // Stock
-  const stock = limb(0.065, 0.13, 0.32, '#5c3924');
-  stock.position.set(0, -0.04, 0.34);
-  stock.rotation.x = -0.12;
+
+  // Realistic warm walnut wood stock (#5c341b)
+  const stock = gunMesh(0.07, 0.15, 0.36, '#5c341b', 0.05, 0.65);
+  stock.position.set(0, -0.04, -0.36);
+  stock.rotation.x = 0.12;
   g.add(stock);
+
   return g;
 }
 
@@ -135,22 +203,22 @@ export class Player {
 
     // V-neck open collar flaps
     const collarL = limb(0.08, 0.22, 0.03, '#179686');
-    collarL.position.set(0.11, 0.44, -0.145);
+    collarL.position.set(0.11, 0.44, 0.145);
     collarL.rotation.z = 0.18;
     this.torso.add(collarL);
 
     const collarR = limb(0.08, 0.22, 0.03, '#179686');
-    collarR.position.set(-0.11, 0.44, -0.145);
+    collarR.position.set(-0.11, 0.44, 0.145);
     collarR.rotation.z = -0.18;
     this.torso.add(collarR);
 
     // White undershirt & chest inset
     const undershirt = limb(0.14, 0.18, 0.02, '#f1f5f9');
-    undershirt.position.set(0, 0.42, -0.14);
+    undershirt.position.set(0, 0.42, 0.14);
     this.torso.add(undershirt);
 
     const chestSkin = limb(0.10, 0.13, 0.02, SKIN);
-    chestSkin.position.set(0, 0.47, -0.142);
+    chestSkin.position.set(0, 0.47, 0.142);
     this.torso.add(chestSkin);
 
     // Leather belt with gold buckle
@@ -159,7 +227,7 @@ export class Player {
     this.torso.add(belt);
 
     const buckle = limb(0.11, 0.09, 0.04, '#d4af37');
-    buckle.position.set(0, 0.04, -0.15);
+    buckle.position.set(0, 0.04, 0.15);
     this.torso.add(buckle);
 
     this.torso.position.y = 1.0;
@@ -172,11 +240,11 @@ export class Player {
 
     // Aviator sunglasses
     const shades = limb(0.24, 0.08, 0.05, '#0e121a');
-    shades.position.set(0, 0.72, -0.13);
+    shades.position.set(0, 0.72, 0.13);
     this.torso.add(shades);
 
     const browBar = limb(0.25, 0.02, 0.04, '#eab308');
-    browBar.position.set(0, 0.76, -0.13);
+    browBar.position.set(0, 0.76, 0.13);
     this.torso.add(browBar);
 
     // Layered 80s hairstyle
@@ -185,11 +253,11 @@ export class Player {
     this.torso.add(hair);
 
     const sideburnL = limb(0.04, 0.16, 0.14, '#241c18');
-    sideburnL.position.set(0.135, 0.73, 0.02);
+    sideburnL.position.set(0.135, 0.73, -0.02);
     this.torso.add(sideburnL);
 
     const sideburnR = limb(0.04, 0.16, 0.14, '#241c18');
-    sideburnR.position.set(-0.135, 0.73, 0.02);
+    sideburnR.position.set(-0.135, 0.73, -0.02);
     this.torso.add(sideburnR);
 
     // Arms
@@ -228,16 +296,16 @@ export class Player {
 
     // Weapons attached to right hand
     this.pistolMesh = buildPistol();
-    this.pistolMesh.position.set(0, -0.52, -0.08);
+    this.pistolMesh.position.set(0, -0.52, 0.08);
     this.armR.add(this.pistolMesh);
 
     this.smgMesh = buildSmg();
-    this.smgMesh.position.set(0, -0.52, -0.08);
+    this.smgMesh.position.set(0, -0.52, 0.08);
     this.smgMesh.visible = false;
     this.armR.add(this.smgMesh);
 
     this.shotgunMesh = buildShotgun();
-    this.shotgunMesh.position.set(0, -0.52, -0.08);
+    this.shotgunMesh.position.set(0, -0.52, 0.08);
     this.shotgunMesh.visible = false;
     this.armR.add(this.shotgunMesh);
 
@@ -259,19 +327,19 @@ export class Player {
 
     // Retro sneakers with white outsoles
     const soleL = limb(0.19, 0.05, 0.30, '#f8fafc');
-    soleL.position.set(0, -0.87, 0.04);
+    soleL.position.set(0, -0.87, 0.05);
     this.legL.add(soleL);
 
     const shoeL = limb(0.18, 0.10, 0.28, SHOES);
-    shoeL.position.set(0, -0.80, 0.04);
+    shoeL.position.set(0, -0.80, 0.05);
     this.legL.add(shoeL);
 
     const soleR = limb(0.19, 0.05, 0.30, '#f8fafc');
-    soleR.position.set(0, -0.87, 0.04);
+    soleR.position.set(0, -0.87, 0.05);
     this.legR.add(soleR);
 
     const shoeR = limb(0.18, 0.10, 0.28, SHOES);
-    shoeR.position.set(0, -0.80, 0.04);
+    shoeR.position.set(0, -0.80, 0.05);
     this.legR.add(shoeR);
 
     this.group.add(this.hips);
@@ -400,10 +468,21 @@ export class Player {
     this.legR.rotation.x = damp(this.legR.rotation.x, -swing, 18, dt);
 
     const aim = this.aimBlend;
-    this.armL.rotation.x = damp(this.armL.rotation.x, -armSwing * (1 - aim) - aim * 1.35, 16, dt);
-    this.armR.rotation.x = damp(this.armR.rotation.x, armSwing * (1 - aim) - aim * 1.35, 16, dt);
+    this.armL.rotation.x = damp(this.armL.rotation.x, -armSwing * (1 - aim) - aim * 1.40, 16, dt);
+    this.armR.rotation.x = damp(this.armR.rotation.x, armSwing * (1 - aim) - aim * 1.40, 16, dt);
     this.armL.rotation.z = damp(this.armL.rotation.z, -aim * 0.22, 14, dt);
     this.armR.rotation.z = damp(this.armR.rotation.z, aim * 0.22, 14, dt);
+
+    // Keep weapon level pointing forward along +Z when aiming, and cleanly in front of hand
+    const weaponPitch = aim * 1.40;
+    this.pistolMesh.rotation.x = weaponPitch;
+    this.smgMesh.rotation.x = weaponPitch;
+    this.shotgunMesh.rotation.x = weaponPitch;
+
+    const weaponZ = 0.08 + aim * 0.04;
+    this.pistolMesh.position.z = weaponZ;
+    this.smgMesh.position.z = weaponZ;
+    this.shotgunMesh.position.z = weaponZ;
 
     const bobTarget = Math.abs(Math.sin(this.phase)) * 0.045 * normalized;
     this.bob = damp(this.bob, bobTarget, 14, dt);

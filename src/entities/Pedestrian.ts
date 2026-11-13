@@ -23,6 +23,8 @@ const SHIRT_TONES = [
 const PANTS_TONES = ['#273c75', '#353b48', '#718093', '#b8a88a', '#2d3436', '#f5f6fa', '#4b5563'];
 const HAIR_TONES = ['#1a1716', '#3b2314', '#59381e', '#8a5024', '#d4af37', '#bca06c', '#71717a'];
 const SHOE_TONES = ['#1e272e', '#e84118', '#3867d6', '#ffffff', '#2c3e50', '#8c7ae6'];
+const PASTEL_TOPS = ['#ff9ebb', '#fbcfe8', '#a7f3d0', '#bae6fd', '#fef08a', '#e9d5ff', '#fed7aa', '#f43f5e', '#ffffff'];
+const SHORTS_SKIRT_TONES = ['#ffffff', '#fbcfe8', '#38bdf8', '#fb7185', '#475569', '#e2e8f0', '#fbbf24', '#fdba74'];
 
 interface PedRig {
   group: THREE.Group;
@@ -84,6 +86,8 @@ export class Pedestrian {
   private pathDir = 1;
   private readonly scratch = { x: 0, z: 0 };
   private readonly scratch2 = { x: 0, z: 0 };
+  private crouchBlend = 0;
+  private crouchTimer = 0;
 
   constructor(x: number, z: number, rng: Rng) {
     this.position.set(x, 0, z);
@@ -150,6 +154,8 @@ export class Pedestrian {
   update(dt: number, world: CollisionWorld, blockCenters: { x: number; z: number }[], rng: Rng): void {
     if (this.state === 'dead') {
       this.deadTimer += dt;
+      this.crouchBlend = 0;
+      this.rig.torso.scale.set(1, 1, 1);
       // Collapse.
       const t = Math.min(1, this.deadTimer * 3.4);
       this.rig.hips.rotation.x = t * (Math.PI / 2) * 0.92;
@@ -168,6 +174,17 @@ export class Pedestrian {
 
     const running = this.state === 'flee';
     const speed = running ? 4.4 : this.speed;
+
+    if (running) {
+      this.crouchTimer += dt;
+      // Occasionally crouch / duck when fleeing from gunfire (every ~2.2s for ~0.8s)
+      const cycle = (this.crouchTimer + this.speed * 1.2) % 2.2;
+      const targetCrouch = cycle < 0.75 ? Math.sin((cycle / 0.75) * Math.PI) * 0.45 : 0;
+      this.crouchBlend += (targetCrouch - this.crouchBlend) * Math.min(1, dt * 8);
+    } else {
+      this.crouchTimer = 0;
+      this.crouchBlend = Math.max(0, this.crouchBlend - dt * 6);
+    }
 
     if (this.path && !running) {
       // Walk the sidewalk loop of the block.
@@ -211,7 +228,24 @@ export class Pedestrian {
     this.rig.legR.rotation.x = -swing;
     this.rig.armL.rotation.x = -swing * 0.8;
     this.rig.armR.rotation.x = swing * 0.8;
-    this.rig.hips.position.y = Math.abs(Math.sin(this.phase)) * (running ? 0.07 : 0.035);
+
+    // Base hip bounce plus crouch lowering
+    const hipBounce = Math.abs(Math.sin(this.phase)) * (running ? 0.07 : 0.035);
+    this.rig.hips.position.y = hipBounce - this.crouchBlend * 0.18;
+
+    // Crouch ducking angle and slight torso compression
+    this.rig.torso.rotation.x = this.crouchBlend * 0.35;
+    this.rig.torso.scale.set(
+      1 + this.crouchBlend * 0.06,
+      1 - this.crouchBlend * 0.14,
+      1 + this.crouchBlend * 0.06,
+    );
+
+    // Ducking arms protect head
+    if (this.crouchBlend > 0.02) {
+      this.rig.armL.rotation.x += this.crouchBlend * 0.5;
+      this.rig.armR.rotation.x += this.crouchBlend * 0.5;
+    }
 
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     const tint = this.hitFlash > 0 ? 1 : 0;
@@ -257,9 +291,15 @@ function buildRig(rng: Rng): PedRig {
   const hips = new THREE.Group();
   const torso = new THREE.Group();
 
+  const isFemale = rng.chance(0.40);
+
   const skin = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(SKIN_TONES)), roughness: 0.85 });
-  const shirt = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(SHIRT_TONES)), roughness: 0.85 });
-  const pants = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(PANTS_TONES)), roughness: 0.88 });
+  const shirt = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(isFemale ? rng.pick(PASTEL_TOPS) : rng.pick(SHIRT_TONES)),
+    roughness: 0.85,
+  });
+  const bottomColor = isFemale ? rng.pick(SHORTS_SKIRT_TONES) : rng.pick(PANTS_TONES);
+  const pants = new THREE.MeshStandardMaterial({ color: new THREE.Color(bottomColor), roughness: 0.88 });
   const shoeUpperMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(rng.pick(SHOE_TONES)), roughness: 0.75 });
   const shoeSoleMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#f0f2f5'), roughness: 0.85 });
   const beltMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#221c17'), roughness: 0.80 });
@@ -270,6 +310,163 @@ function buildRig(rng: Rng): PedRig {
     mesh.castShadow = true;
     return mesh;
   };
+
+  if (isFemale) {
+    // ── Female Torso ──
+    // Slightly narrower shoulders: 0.32 x 0.44 x 0.20
+    const body = box(0.32, 0.44, 0.20, shirt);
+    body.position.y = 0.24;
+    torso.add(body);
+
+    // Scoop / V-neck skin opening
+    const neckline = box(0.10, 0.10, 0.04, skin);
+    neckline.position.set(0, 0.40, 0.09);
+    torso.add(neckline);
+
+    // High-waist waistband / belt
+    const waistband = box(0.33, 0.06, 0.21, pants);
+    waistband.position.set(0, 0.05, 0);
+    torso.add(waistband);
+
+    // ── Head & Face ──
+    const head = box(0.21, 0.23, 0.21, skin);
+    head.position.y = 0.60;
+    torso.add(head);
+
+    // Nose
+    const nose = box(0.035, 0.05, 0.04, skin);
+    nose.position.set(0, 0.59, 0.11);
+    torso.add(nose);
+
+    // Female hair style: ponytail (0), bob (1), long waves (2)
+    const hairTone = rng.pick(HAIR_TONES);
+    const hairMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(hairTone), roughness: 0.9 });
+    const hairStyle = rng.int(0, 2);
+
+    if (hairStyle === 0) {
+      // Ponytail
+      const hairCrown = box(0.23, 0.10, 0.23, hairMat);
+      hairCrown.position.set(0, 0.71, -0.01);
+      const hairTie = box(0.06, 0.04, 0.06, shirt);
+      hairTie.position.set(0, 0.72, -0.13);
+      const ponytail = box(0.06, 0.22, 0.07, hairMat);
+      ponytail.position.set(0, 0.63, -0.16);
+      ponytail.rotation.x = -0.25;
+      torso.add(hairCrown, hairTie, ponytail);
+    } else if (hairStyle === 1) {
+      // Sleek Bob cut
+      const hairCrown = box(0.24, 0.10, 0.24, hairMat);
+      hairCrown.position.set(0, 0.71, 0);
+      const bobL = box(0.04, 0.22, 0.22, hairMat);
+      bobL.position.set(0.11, 0.61, 0);
+      const bobR = box(0.04, 0.22, 0.22, hairMat);
+      bobR.position.set(-0.11, 0.61, 0);
+      const bobBack = box(0.22, 0.20, 0.04, hairMat);
+      bobBack.position.set(0, 0.62, -0.11);
+      torso.add(hairCrown, bobL, bobR, bobBack);
+    } else {
+      // Long flowing waves
+      const hairCrown = box(0.24, 0.10, 0.24, hairMat);
+      hairCrown.position.set(0, 0.71, -0.01);
+      const waveL = box(0.04, 0.34, 0.16, hairMat);
+      waveL.position.set(0.11, 0.55, 0.03);
+      const waveR = box(0.04, 0.34, 0.16, hairMat);
+      waveR.position.set(-0.11, 0.55, 0.03);
+      const cascade = box(0.22, 0.34, 0.04, hairMat);
+      cascade.position.set(0, 0.54, -0.11);
+      torso.add(hairCrown, waveL, waveR, cascade);
+    }
+
+    // Sunglasses (45% probability)
+    if (rng.chance(0.45)) {
+      const glassesGlass = new THREE.MeshStandardMaterial({ color: 0x0c0e12, roughness: 0.1, metalness: 0.85 });
+      const glassesFrame = new THREE.MeshStandardMaterial({
+        color: rng.chance(0.5) ? 0xd4af37 : 0x22262c,
+        metalness: 0.7,
+        roughness: 0.3,
+      });
+      const lenses = box(0.17, 0.045, 0.03, glassesGlass);
+      lenses.position.set(0, 0.62, 0.11);
+      const bridge = box(0.04, 0.02, 0.02, glassesFrame);
+      bridge.position.set(0, 0.63, 0.11);
+      torso.add(lenses, bridge);
+    }
+
+    torso.position.y = 0.96;
+    hips.add(torso);
+
+    // ── Female Arms (narrower shoulder position: 0.21) ──
+    const armL = new THREE.Group();
+    const sleeveL = box(0.09, 0.18, 0.10, shirt);
+    sleeveL.position.y = -0.09;
+    const handL = box(0.08, 0.28, 0.09, skin);
+    handL.position.y = -0.32;
+    armL.add(sleeveL, handL);
+    armL.position.set(0.21, 0.44, 0);
+    torso.add(armL);
+
+    const armR = new THREE.Group();
+    const sleeveR = box(0.09, 0.18, 0.10, shirt);
+    sleeveR.position.y = -0.09;
+    const handR = box(0.08, 0.28, 0.09, skin);
+    handR.position.y = -0.32;
+    armR.add(sleeveR, handR);
+    armR.position.set(-0.21, 0.44, 0);
+    torso.add(armR);
+
+    // ── Female Lower Body (High-waist shorts or skirt) ──
+    const isSkirt = rng.chance(0.5);
+    if (isSkirt) {
+      const skirt = box(0.35, 0.22, 0.23, pants);
+      skirt.position.set(0, 0.80, 0);
+      hips.add(skirt);
+    }
+
+    const legL = new THREE.Group();
+    if (!isSkirt) {
+      // High-waist shorts: upper leg has shorts color, lower leg is bare skin
+      const shortsL = box(0.13, 0.22, 0.15, pants);
+      shortsL.position.y = -0.11;
+      const lowerLegL = box(0.11, 0.46, 0.13, skin);
+      lowerLegL.position.y = -0.45;
+      legL.add(shortsL, lowerLegL);
+    } else {
+      // Skirt: legs are skin
+      const bareLegL = box(0.11, 0.66, 0.13, skin);
+      bareLegL.position.y = -0.33;
+      legL.add(bareLegL);
+    }
+    const shoeL = box(0.13, 0.08, 0.20, shoeUpperMat);
+    shoeL.position.set(0, -0.71, 0.02);
+    const soleL = box(0.13, 0.04, 0.21, shoeSoleMat);
+    soleL.position.set(0, -0.77, 0.02);
+    legL.add(shoeL, soleL);
+    legL.position.set(0.09, 0.84, 0);
+    hips.add(legL);
+
+    const legR = new THREE.Group();
+    if (!isSkirt) {
+      const shortsR = box(0.13, 0.22, 0.15, pants);
+      shortsR.position.y = -0.11;
+      const lowerLegR = box(0.11, 0.46, 0.13, skin);
+      lowerLegR.position.y = -0.45;
+      legR.add(shortsR, lowerLegR);
+    } else {
+      const bareLegR = box(0.11, 0.66, 0.13, skin);
+      bareLegR.position.y = -0.33;
+      legR.add(bareLegR);
+    }
+    const shoeR = box(0.13, 0.08, 0.20, shoeUpperMat);
+    shoeR.position.set(0, -0.71, 0.02);
+    const soleR = box(0.13, 0.04, 0.21, shoeSoleMat);
+    soleR.position.set(0, -0.77, 0.02);
+    legR.add(shoeR, soleR);
+    legR.position.set(-0.09, 0.84, 0);
+    hips.add(legR);
+
+    group.add(hips);
+    return { group, hips, torso, armL, armR, legL, legR };
+  }
 
   // ── Torso ──
   const body = box(0.38, 0.46, 0.22, shirt);

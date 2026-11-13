@@ -218,25 +218,28 @@ export class Effects {
     this.tracers.push({ ax, ay, az, bx, by, bz, life, maxLife: life });
   }
 
-  muzzleFlash(x: number, y: number, z: number, dirX: number, dirZ: number): void {
+  muzzleFlash(x: number, y: number, z: number, dirX = 0, dirZ = 0): void {
     this.flash.position.set(x + dirX * 0.5, y, z + dirZ * 0.5);
-    this.flash.intensity = 9;
+    this.flash.intensity = 18;
+    this.flash.distance = 8;
     this.flash.visible = true;
-    this.flashTimer = 0.07;
+    this.flashTimer = 0.055;
     this.sprite.position.copy(this.flash.position);
     this.sprite.visible = true;
-    const c = new THREE.Color(1, 0.85, 0.5);
-    for (let i = 0; i < 5; i++) {
+    const c = new THREE.Color(1, 0.9, 0.55);
+    const angles = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
+    for (let i = 0; i < 4; i++) {
+      const a = angles[i];
       this.spawnParticle(
         x + dirX * 0.6,
         y,
         z + dirZ * 0.6,
-        dirX * 6 + (Math.random() - 0.5) * 2,
-        1.2 + Math.random() * 1.6,
-        dirZ * 6 + (Math.random() - 0.5) * 2,
+        Math.cos(a) * 5 + dirX * 4,
+        0.8 + Math.random() * 1.2,
+        Math.sin(a) * 5 + dirZ * 4,
         c,
-        0.1,
-        0.22,
+        0.08,
+        0.18,
         0,
       );
     }

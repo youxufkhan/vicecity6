@@ -65,6 +65,7 @@ export class Game {
   private paused = false;
   private startCar: Vehicle | null = null;
   private pickups: Pickup[] = [];
+  private neonLights: THREE.PointLight[] = [];
   private markerMesh: THREE.Mesh;
   private markerRing: THREE.Mesh;
   private targetRing: THREE.Mesh;
@@ -113,6 +114,19 @@ export class Game {
     this.scene.add(this.city.group);
     this.props = buildProps(this.city);
     this.scene.add(this.props.group);
+
+    const neonLightColors = [0xff2e88, 0x35e0ff, 0x58f5b5];
+    const neonLightPositions = [
+      new THREE.Vector3(roadCenterX(2), 8, roadCenterZ(2)),
+      new THREE.Vector3(roadCenterX(4), 8, roadCenterZ(4)),
+      new THREE.Vector3(roadCenterX(1), 8, roadCenterZ(5)),
+    ];
+    this.neonLights = neonLightPositions.map((pos, i) => {
+      const light = new THREE.PointLight(neonLightColors[i], 0, 60, 1.6);
+      light.position.copy(pos);
+      this.scene.add(light);
+      return light;
+    });
     this.effects = new Effects(this.scene);
     this.footCops = new FootCopManager(this.scene);
 
@@ -510,6 +524,14 @@ export class Game {
   private updateIdle(dt: number): void {
     // Keep the world breathing while the game is paused or a screen is up.
     this.sky.update(dt, this.player.position);
+    if (this.city.waterTexture) {
+      this.city.waterTexture.offset.x += 0.0006 * dt;
+      this.city.waterTexture.offset.y += 0.0003 * dt;
+    }
+    const night = this.sky.night;
+    for (const mat of this.city.facadeMaterials) mat.emissiveIntensity = night * 1.25;
+    for (const mat of this.city.neonMaterials) mat.emissiveIntensity = 2.0 + night * 2.5;
+    for (const l of this.neonLights) l.intensity = night * 14;
     for (const car of this.traffic.traffic) car.update(dt, this.city.collision);
     for (const car of this.traffic.police) car.update(dt, this.city.collision);
     resolveVehiclePairs([...this.traffic.traffic, ...this.traffic.police]);
@@ -524,6 +546,14 @@ export class Game {
 
   private updateTitle(dt: number): void {
     this.sky.update(dt, new THREE.Vector3(0, 0, 0));
+    if (this.city.waterTexture) {
+      this.city.waterTexture.offset.x += 0.0006 * dt;
+      this.city.waterTexture.offset.y += 0.0003 * dt;
+    }
+    const night = this.sky.night;
+    for (const mat of this.city.facadeMaterials) mat.emissiveIntensity = night * 1.25;
+    for (const mat of this.city.neonMaterials) mat.emissiveIntensity = 2.0 + night * 2.5;
+    for (const l of this.neonLights) l.intensity = night * 14;
     const t = this.elapsed * 0.06;
     const cx = Math.cos(t) * 190;
     const cz = Math.sin(t) * 190;
@@ -660,10 +690,14 @@ export class Game {
 
     /* ── world ── */
     this.sky.update(dt, this.player.position);
-    this.city.waterTexture.offset.x = this.elapsed * 0.006;
-    this.city.waterTexture.offset.y = this.elapsed * 0.0035;
+    if (this.city.waterTexture) {
+      this.city.waterTexture.offset.x += 0.0006 * dt;
+      this.city.waterTexture.offset.y += 0.0003 * dt;
+    }
     const night = this.sky.night;
     for (const mat of this.city.facadeMaterials) mat.emissiveIntensity = night * 1.25;
+    for (const mat of this.city.neonMaterials) mat.emissiveIntensity = 2.0 + night * 2.5;
+    for (const l of this.neonLights) l.intensity = night * 14;
     headlightMaterial.emissiveIntensity = 0.12 + night * 1.9;
     tailMaterial.emissiveIntensity = 0.3 + night * 0.5;
 
@@ -820,6 +854,9 @@ export class Game {
   private onShot(weaponId: string): void {
     const heat = WEAPONS[weaponId as keyof typeof WEAPONS]?.heat ?? 0.3;
     this.wanted.add(heat);
+    // Muzzle flash at weapon aim origin.
+    this.effects.muzzleFlash(this.weaponAimOrigin.x, this.weaponAimOrigin.y, this.weaponAimOrigin.z);
+    this.cameraRig.addShake(0.08);
     // Gunfire scatters the crowd.
     for (const ped of this.peds.peds) {
       if (dist2D(ped.position.x, ped.position.z, this.player.position.x, this.player.position.z) < 26) {
@@ -871,6 +908,7 @@ export class Game {
         if (car.driver === 'player') {
           this.player.damage(clamp(impact - 8, 0, 22));
           this.hud.damageFlash();
+          this.cameraRig.addShake(0.22);
         }
         if (this.traffic.police.includes(car)) this.wanted.add(0.3);
       }
@@ -959,6 +997,7 @@ export class Game {
         if (damage > 0 && !this.player.vehicle) {
           this.player.damage(damage);
           this.hud.damageFlash();
+          this.cameraRig.addShake(0.22);
           this.audio.play('hit');
         }
       }
@@ -1366,14 +1405,14 @@ export class Game {
 
   /** Used by tests to verify foot officer combat and hit detection. */
   debugShootCop(): { hit: boolean; killed: boolean; copAlive: boolean } {
-    if (this.footCops.cops.length === 0) return { hit: false, killed: false, copAlive: true };
-    const cop = this.footCops.cops[0];
-    const fx = Math.sin(cop.yaw) || 0;
-    const fz = Math.cos(cop.yaw) || 1;
-    // Aim directly at the officer from 1.5 m in front of them along their facing line.
-    this.weaponAimOrigin.set(cop.position.x + fx * 1.5, 1.35, cop.position.z + fz * 1.5);
+    const cop = this.footCops.cops.find((c) => c.alive);
+    if (!cop) return { hit: false, killed: false, copAlive: false };
+    const fx = Math.sin(cop.yaw);
+    const fz = Math.cos(cop.yaw);
+    // Aim directly at the officer from 0.8 m in front of them along their facing line.
+    this.weaponAimOrigin.set(cop.position.x + fx * 0.8, 1.35, cop.position.z + fz * 0.8);
     this.weaponAimDir.set(-fx, 0, -fz).normalize();
-    this.player.position.set(cop.position.x + fx * 1.5, 0, cop.position.z + fz * 1.5);
+    this.player.position.set(cop.position.x + fx * 0.8, 0, cop.position.z + fz * 0.8);
     const hit = this.weapons.hitscan(this.weaponAimOrigin, this.weaponAimDir, 10);
     const targetCop = hit.kind === 'cop' && hit.cop ? hit.cop : cop;
     const killed = targetCop.damage(100);

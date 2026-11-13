@@ -149,6 +149,8 @@ The same function drives the AI (stop at red) and the visible signal heads
   boulevard and the beachfront avenue
 - **Benches, hydrants, bins** — scattered along the pavements
 - **Billboards** — 14 roadside panels with generated advertising art
+- **Neon signs** — vibrant emissive signage across building facades in downtown, uptown, and the beach strip with dynamic night brightness modulation
+- **Ocean surface** — animated UV wave drift with tropical turquoise shading
 
 Everything that repeats is an `InstancedMesh`; a prop that appears N times
 costs one draw call, not N.
